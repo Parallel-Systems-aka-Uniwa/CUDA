@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 {
     int **A, **A_cov;
     int *d_A;
-    FILE *fp_A, *fp_A_cov;
+    FILE *fpA, *fpA_cov;
     int i, j;
     int matrix_size, grid_size, block_size;
 
@@ -96,6 +96,9 @@ int main(int argc, char *argv[])
             A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
         }
     }
+
+    fclose(fpA);
+    fclose(fpA_cov);
 
 
     return 0;
