@@ -59,17 +59,19 @@ int main(int argc, char *argv[])
     int **A, **B, **C;
     int *d_A, *d_N, *d_outArray, *d_max, *d_min;
     float *d_avg;
+    float elapsedTime;
     int i, j;
     int matrix_size, grid_size, block_size;
     FILE *fpA, *fpB, *fpC;
     cudaEvent_t start, stop;
+    cudaError_t err;
     size_t bytes;
 
     matrix_size = N;
     grid_size = BL;
     block_size = T;
     
-    if (block_size < 1 || block_size > 1024)
+    if (block_size < 1 || block_size > 1024) 
     {
         printf("Threads per block must be between 1 to 1024.\n");
         exit(1);
@@ -108,8 +110,11 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    err = cudaEventCreate(&start);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
+    err = cudaEventCreate(&stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
+
 
     printf("Matrix size  : %d x %d\n", matrix_size, matrix_size );
     printf("Grid size    : %d\n", grid_size);
@@ -158,22 +163,29 @@ int main(int argc, char *argv[])
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
     bytes = matrix_size * matrix_size * sizeof(int);
 
-    cudaEventRecord(start, 0);
+    err = cudaEventRecord(start, 0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    cudaMalloc((void **) &d_A, bytes);
-    cudaMalloc((void **) &d_outArray, bytes);
-    cudaMalloc((void **) &d_N, sizeof(int));
-    cudaMalloc((void **) &d_avg, sizeof(float));
-    cudaMalloc((void **) &d_max, sizeof(int));
-    cudaMalloc((void **) &d_min, sizeof(int)); 
+    err = cudaMalloc((void **) &d_A, bytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_outArray, bytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_outArray, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_N, sizeof(int));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_N, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_avg, sizeof(float));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_avg, sizeof(float)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_max, sizeof(int));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_max, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_min, sizeof(int)); 
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_min, sizeof(int)) failed."); exit(1); }
 
-    
 
-
-
-
-
-
+    err = cudaEventRecord(stop, 0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop, 0) failed."); exit(1); }
+    err = cudaEventSynchronize(stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
+    err = cudaEventElapsedTime(&elapsedTime, start, stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime, start, stop) failed."); exit(1); }
 /********************************************/
 
     for (i = 0; i < matrix_size; i++)
