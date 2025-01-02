@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
     A = (int **) malloc(matrix_size * sizeof(int *));
     B = (int **) malloc(matrix_size * sizeof(int *));
     C = (int **) malloc(matrix_size * sizeof(int *));
+    
     for (i = 0; i < matrix_size; i++) 
     {
         A[i] = (int *) malloc(matrix_size * sizeof(int));
@@ -102,9 +103,9 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    for (i = 0; i < size; i++)
+    for (i = 0; i < matrix_size; i++)
     {
-        for (j = 0; j < size; j++)
+        for (j = 0; j < matrix_size; j++)
         {
             A[i][j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
             A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
@@ -113,6 +114,18 @@ int main(int argc, char *argv[])
         }
     }
 
+    for (i = 0; i < matrix_size; i++)
+    {
+        for (j = 0; j < matrix_size; j++)
+        {
+            fprintf(fpA, "%4d ", A[i][j]);
+            fprintf(fpB, "%4d ", B[i][j]);
+            fprintf(fpC, "%4d ", C[i][j]);
+        }
+        fprintf(fpA, "\n");
+        fprintf(fpB, "\n");
+        fprintf(fpC, "\n");
+    }
 
     return 0;
 }
