@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
 {
     int **A, **B, **C;
     int *d_A, *d_output;
-    FILE *fp_A, *fp_B, *fp_C;
+    FILE *fpA, *fpB, *fpC;
     int i, j;
     int matrix_size, grid_size, block_size;
 
