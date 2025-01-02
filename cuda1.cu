@@ -19,13 +19,51 @@
 #define BL 5
 #define T 2
 
+__device__ calcAvg()
+{
+
+}
+
+__device__ calcMin()
+{
+
+}
+
+__device__ findMax()
+{
+
+}
+
+__device__ checkMax()
+{
+
+}
+
+__device__ createB()
+{
+
+}
+
+__device__ createC()
+{
+
+}
+
+__global__ kernel()
+{
+    
+}
+
 int main(int argc, char *argv[])
 {
     int **A, **B, **C;
-    int *d_A, *d_output;
-    FILE *fpA, *fpB, *fpC;
+    int *d_A, *d_N, *d_outArray, *d_max, *d_min;
+    float *d_avg;
     int i, j;
     int matrix_size, grid_size, block_size;
+    FILE *fpA, *fpB, *fpC;
+    cudaEvent_t start, stop;
+    size_t bytes;
 
     matrix_size = N;
     grid_size = BL;
@@ -69,6 +107,9 @@ int main(int argc, char *argv[])
         printf("Cannot open file %s\n", argv[3]);
         exit(1);
     }
+
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
     printf("Matrix size  : %d x %d\n", matrix_size, matrix_size );
     printf("Grid size    : %d\n", grid_size);
@@ -114,6 +155,27 @@ int main(int argc, char *argv[])
         }
     }
 
+/******************* ΠΑΡΑΛΛΗΛΑ ***************/
+    bytes = matrix_size * matrix_size * sizeof(int);
+
+    cudaEventRecord(start, 0);
+
+    cudaMalloc((void **) &d_A, bytes);
+    cudaMalloc((void **) &d_outArray, bytes);
+    cudaMalloc((void **) &d_N, sizeof(int));
+    cudaMalloc((void **) &d_avg, sizeof(float));
+    cudaMalloc((void **) &d_max, sizeof(int));
+    cudaMalloc((void **) &d_min, sizeof(int)); 
+
+    
+
+
+
+
+
+
+/********************************************/
+
     for (i = 0; i < matrix_size; i++)
     {
         for (j = 0; j < matrix_size; j++)
@@ -122,10 +184,29 @@ int main(int argc, char *argv[])
             fprintf(fpB, "%4d ", B[i][j]);
             fprintf(fpC, "%4d ", C[i][j]);
         }
+
         fprintf(fpA, "\n");
         fprintf(fpB, "\n");
         fprintf(fpC, "\n");
     }
+
+    fclose(fpA);
+    fclose(fpB);
+    fclose(fpC);
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
+
+    for (i = 0; i < matrix_size; i++)
+    {
+        free(A[i]);
+        free(B[i]);
+        free(C[i]);
+    }
+
+    free(A);
+    free(B);
+    free(C);
 
     return 0;
 }
