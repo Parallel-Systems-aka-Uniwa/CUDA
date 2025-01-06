@@ -47,6 +47,8 @@ int main(int argc, char *argv[])
 {
     int **h_A;
     double **h_OutArr;
+    double h_Avg;
+    int h_Max, h_Min;
     int *d_A, *d_OutArr, *d_Max, *d_Min;
     double *d_Avg;
     float elapsedTime;
@@ -201,6 +203,11 @@ int main(int argc, char *argv[])
 
     kernel<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_Avg, d_Max, d_Min, matrix_size);
 
+    cudaMemCpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+    cudaMemCpy(h_Avg, d_Avg, sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemCpy(h_Max, d_Max, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemCpy(h_Min, d_Min, sizeof(int), cudaMemcpyDeviceToHost);
+
     err = cudaEventRecord(stop, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop, 0) failed."); exit(1); }
     err = cudaEventSynchronize(stop);
@@ -209,6 +216,9 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime, start, stop) failed."); exit(1); }
     printf ("Time for the kernel: %f ms\n", elapsedTime);
 
+    printf("Average: %lf\n", h_Avg);
+    printf("Max: %d\n", h_Max);
+    printf("Min: %d\n", h_Min);
 /********************************************/
 
     for (i = 0; i < matrix_size; i++)
@@ -237,6 +247,12 @@ int main(int argc, char *argv[])
 
     free(h_A);
     free(h_OutArr);
+
+    cudaFree(d_A);
+    cudaFree(d_OutArr);
+    cudaFree(d_Avg);
+    cudaFree(d_Max);
+    cudaFree(d_Min);
 
     return 0;
 }
