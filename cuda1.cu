@@ -16,7 +16,10 @@
 #include <cuda.h>
 
 #define N 10
-#define T 2
+#define blX 3
+#define blY 2
+#define tX 4
+#define tY 3
 
 __device__ void calcAvg()
 {
@@ -60,41 +63,62 @@ int main(int argc, char *argv[])
     float *d_avg;
     float elapsedTime;
     int i, j;
-    int matrix_size, grid_size, block_size;
+    int matrix_size, grid_sizeX, grid_sizeY, block_sizeX, block_sizeY;
+    int max_threads, max_block_dimX, max_bloc_dimY, max_grid_dimX, max_grid_dimY;
+    int total_threads;
     FILE *fpA, *fpB, *fpC;
     cudaEvent_t start, stop;
     cudaError_t err;
+    cudaDeviceProp prop;
     size_t bytes;
 
     matrix_size = N;
-   grid_size = 5;
-    block_size = T;
+    grid_sizeX = blX;
+    grid_sizeY = blY;
+    block_sizeX = tX;
+    block_sizeY = tY;
 
-    cudaDeviceProp prop;
-cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
+    cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
 
-printf("Max threads per block: %d\n", prop.maxThreadsPerBlock);
-printf("Max block dimensions: (%d, %d, %d)\n",
-       prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
-printf("Max grid dimensions: (%d, %d, %d)\n",
-       prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
+    max_threads = prop.maxThreadsPerBlock;
+    max_block_dimX = prop.maxThreadsDim[0];
+    max_block_dimY = prop.maxThreadsDim[1];
+    max_grid_dimX = prop.maxGridSize[0];
+    max_grid_dimY = prop.maxGridSize[1];
 
-    
-    if (block_size < 1 || block_size > 32) 
+    printf("Max threads per block: %d\n", max_threads);
+    printf("Max block dimensions: (%d, %d, %d)\n", max_block_dimX, max_block_dimY);
+    printf("Max grid dimensions: (%d, %d, %d)\n", max_grid_dimX, max_grid_dimY);
+
+    total_threads = block_sizeX * block_sizeY;
+
+    if (block_sizeX < 1 || block_sizeY < 1)
     {
-        printf("Threads x Threads per block must be between 1 to 32.\n");
+        printf("Error --> Threads per block (block size) must be at least 1\n");
         exit(1);
     }
 
-    if (grid_size < 1 || grid_size > (matrix_size / block_size))
+    if (grid_sizeX < 1 || grid_sizeY < 1)
     {
-        printf("Blocks must be between 1 to 65535.\n");
+        printf("Error --> Blocks per grid (grid size) must be at least 1\n");
         exit(1);
     }
 
-    if (argc != 4) 
+    if (block_sizeX > max_block_dimX || block_sizeY > max_block_dimY)
     {
-        printf("Usage: %s A.txt B.txt C.txt\n", argv[0]);
+        printf("Error --> Threads per block (block size) exceed maximum allowed for GPU Titan Rtx\n");
+        exit(1);
+    }
+
+    if (total_threads > max_threads)
+    {
+        printf("Error --> Total threads per block exceed maximum allowed for GPU Titan Rtx\n");
+        exit(1);
+    }
+
+    if (grid_sizeX > max_grid_dimX || grid_sizeY > max_grid_dimY)
+    {
+        printf("Error --> Blocks per grid (grid size) exceed maximum allowed for GPU Titan Rtx\n");
         exit(1);
     }
 
