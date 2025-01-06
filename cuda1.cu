@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
     max_grid_dimX = prop.maxGridSize[0];
     max_grid_dimY = prop.maxGridSize[1];
 
+    printf("Device name: %s\n", prop.name);
     printf("Max threads per block: %d\n", max_threads);
     printf("Max block dimensions: (%d, %d, %d)\n", max_block_dimX, max_block_dimY);
     printf("Max grid dimensions: (%d, %d, %d)\n", max_grid_dimX, max_grid_dimY);
