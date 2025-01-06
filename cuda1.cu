@@ -203,10 +203,10 @@ int main(int argc, char *argv[])
 
     kernel<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_Avg, d_Max, d_Min, matrix_size);
 
-    cudaMemCpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
-    cudaMemCpy(h_Avg, d_Avg, sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemCpy(h_Max, d_Max, sizeof(int), cudaMemcpyDeviceToHost);
-    cudaMemCpy(h_Min, d_Min, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_Avg, d_Avg, sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_Max, d_Max, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_Min, d_Min, sizeof(int), cudaMemcpyDeviceToHost);
 
     err = cudaEventRecord(stop, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop, 0) failed."); exit(1); }
