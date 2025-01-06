@@ -86,11 +86,12 @@ int main(int argc, char *argv[])
     max_grid_dimX = prop.maxGridSize[0];
     max_grid_dimY = prop.maxGridSize[1];
 
+    printf("--------------- Device Properties ---------------\n");
     printf("Device name           : %s\n", prop.name);
     printf("Max threads per block : %d\n", max_threads);
-    printf("Max block dimensions  : %d x %d)\n", max_block_dimX, max_block_dimY);
+    printf("Max block dimensions  : %d x %d\n", max_block_dimX, max_block_dimY);
     printf("Max grid dimensions   : %d x %d\n", max_grid_dimX, max_grid_dimY);
-    printf("-----------------------------------\n");
+    printf("-------------------------------------------------\n");
 
     total_threads = block_sizeX * block_sizeY;
 
@@ -108,19 +109,19 @@ int main(int argc, char *argv[])
 
     if (block_sizeX > max_block_dimX || block_sizeY > max_block_dimY)
     {
-        printf("Error --> Threads per block (block size) exceed maximum allowed for GPU Titan Rtx\n");
+        printf("Error --> Threads per block (block size) exceed maximum allowed for %s\n", prop.name);
         exit(1);
     }
 
     if (total_threads > max_threads)
     {
-        printf("Error --> Total threads per block exceed maximum allowed for GPU Titan Rtx\n");
+        printf("Error --> Total threads per block exceed maximum allowed for %s\n", prop.name);
         exit(1);
     }
 
     if (grid_sizeX > max_grid_dimX || grid_sizeY > max_grid_dimY)
     {
-        printf("Error --> Blocks per grid (grid size) exceed maximum allowed for GPU Titan Rtx\n");
+        printf("Error --> Blocks per grid (grid size) exceed maximum allowed for %s\n", prop.name);
         exit(1);
     }
 
@@ -150,11 +151,11 @@ int main(int argc, char *argv[])
     err = cudaEventCreate(&stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
 
-
-    printf("Matrix size: %d x %d\n", matrix_size, matrix_size);
-    printf("Grid size: %d x %d\n", grid_sizeX, grid_sizeY);
-    printf("Block size: %d x %d\n", block_sizeX, block_sizeY);
-    printf("-----------------------------------\n");
+    printf("--------------- Input Parameters ---------------\n");
+    printf("Matrix size : %d x %d\n", matrix_size, matrix_size);
+    printf("Grid size   : %d x %d\n", grid_sizeX, grid_sizeY);
+    printf("Block size  : %d x %d\n", block_sizeX, block_sizeY);
+    printf("------------------------------------------------\n");
 
     A = (int **) malloc(matrix_size * sizeof(int *));
     B = (int **) malloc(matrix_size * sizeof(int *));
