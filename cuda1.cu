@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     double **h_OutArr;
     int *d_A, *d_OutArr, *d_Max, *d_Min;
     double *d_Avg;
-    double elapsedTime;
+    float elapsedTime;
     int i, j;
     int matrix_size, grid_sizeX, grid_sizeY, block_sizeX, block_sizeY;
     int max_threads, max_block_dimX, max_block_dimY, max_grid_dimX, max_grid_dimY;
@@ -170,8 +170,8 @@ int main(int argc, char *argv[])
         for (j = 0; j < matrix_size; j++)
         {
             h_A[i][j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
-            h_A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
-            h_OutArr = 0.0;
+            h_A[i][j] = h_A[i][j] >= 0 ? h_A[i][j] + 10 : h_A[i][j] - 10;  // Τυχαία επιλογή προσήμου
+            h_OutArr[i][j] = 0.0;
         }
     }
 
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
     err = cudaMalloc((void **) &d_Min, sizeof(int)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Min, sizeof(int)) failed."); exit(1); }
 
-    err = cudaMemcpy(d_A, A, intBytes, cudaMemcpyHostToDevice);
+    err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
     
     dim3 dimBlock(block_sizeX, block_sizeY);
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
     err = cudaEventElapsedTime(&elapsedTime, start, stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime, start, stop) failed."); exit(1); }
-    printf ("Time for the kernel: %lf ms\n", elapsedTime);
+    printf ("Time for the kernel: %f ms\n", elapsedTime);
 
 /********************************************/
 
@@ -215,33 +215,28 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < matrix_size; j++)
         {
-            fprintf(fpA, "%4d ", A[i][j]);
-            fprintf(fpB, "%4d ", B[i][j]);
-            fprintf(fpC, "%4d ", C[i][j]);
+            fprintf(fpA, "%4d ", h_A[i][j]);
+            fprintf(fpOutArr, "%4d ", h_OutArr[i][j]);
         }
 
         fprintf(fpA, "\n");
-        fprintf(fpB, "\n");
-        fprintf(fpC, "\n");
+        fprintf(fpOutArr, "\n");
     }
 
     fclose(fpA);
-    fclose(fpB);
-    fclose(fpC);
+    fclose(fpOutArr);
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
     for (i = 0; i < matrix_size; i++)
     {
-        free(A[i]);
-        free(B[i]);
-        free(C[i]);
+        free(h_A[i]);
+        free(h_OutArr[i]);
     }
 
-    free(A);
-    free(B);
-    free(C);
+    free(h_A);
+    free(h_OutArr);
 
     return 0;
 }
