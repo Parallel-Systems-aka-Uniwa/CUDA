@@ -16,7 +16,6 @@
 #include <cuda.h>
 
 #define N 10
-#define BL 5
 #define T 2
 
 __device__ calcAvg()
@@ -70,14 +69,24 @@ int main(int argc, char *argv[])
     matrix_size = N;
     grid_size = BL;
     block_size = T;
+
+    cudaDeviceProp prop;
+cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
+
+printf("Max threads per block: %d\n", prop.maxThreadsPerBlock);
+printf("Max block dimensions: (%d, %d, %d)\n",
+       prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+printf("Max grid dimensions: (%d, %d, %d)\n",
+       prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
+
     
-    if (block_size < 1 || block_size > 1024) 
+    if (block_size < 1 || block_size > 32) 
     {
-        printf("Threads per block must be between 1 to 1024.\n");
+        printf("Threads x Threads per block must be between 1 to 32.\n");
         exit(1);
     }
 
-    if (grid_size < 1 || grid_size > 65535)
+    if (grid_size < 1 || grid_size > (matrix_size / block_size))
     {
         printf("Blocks must be between 1 to 65535.\n");
         exit(1);
@@ -186,6 +195,8 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
     err = cudaEventElapsedTime(&elapsedTime, start, stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime, start, stop) failed."); exit(1); }
+    printf ("Time for the kernel: %f ms\n", elapsedTime);
+
 /********************************************/
 
     for (i = 0; i < matrix_size; i++)
