@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     float elapsedTime;
     int i, j;
     int matrix_size, grid_sizeX, grid_sizeY, block_sizeX, block_sizeY;
-    int max_threads, max_block_dimX, max_bloc_dimY, max_grid_dimX, max_grid_dimY;
+    int max_threads, max_block_dimX, max_block_dimY, max_grid_dimX, max_grid_dimY;
     int total_threads;
     FILE *fpA, *fpB, *fpC;
     cudaEvent_t start, stop;
@@ -90,6 +90,7 @@ int main(int argc, char *argv[])
     printf("Max threads per block: %d\n", max_threads);
     printf("Max block dimensions: (%d, %d, %d)\n", max_block_dimX, max_block_dimY);
     printf("Max grid dimensions: (%d, %d, %d)\n", max_grid_dimX, max_grid_dimY);
+    printf("-----------------------------------\n");
 
     total_threads = block_sizeX * block_sizeY;
 
@@ -150,9 +151,9 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
 
 
-    printf("Matrix size  : %d x %d\n", matrix_size, matrix_size );
-    printf("Grid size    : %d\n", grid_size);
-    printf("Block size   : %d\n", block_size);
+    printf("Matrix size: %d x %d\n", matrix_size, matrix_size);
+    printf("Grid size: %d x %d\n", grid_sizeX, grid_sizeY);
+    printf("Block size: %d x %d\n", block_sizeX, block_sizeY);
     printf("-----------------------------------\n");
 
     A = (int **) malloc(matrix_size * sizeof(int *));
