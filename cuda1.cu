@@ -18,37 +18,37 @@
 #define N 10
 #define T 2
 
-__device__ calcAvg()
+__device__ void calcAvg()
 {
 
 }
 
-__device__ calcMin()
+__device__ void calcMin()
 {
 
 }
 
-__device__ findMax()
+__device__ void findMax()
 {
 
 }
 
-__device__ checkMax()
+__device__ void checkMax()
 {
 
 }
 
-__device__ createB()
+__device__ void createB()
 {
 
 }
 
-__device__ createC()
+__device__ void createC()
 {
 
 }
 
-__global__ kernel()
+__global__ void kernel()
 {
     
 }
@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     size_t bytes;
 
     matrix_size = N;
-    grid_size = BL;
+   grid_size = 5;
     block_size = T;
 
     cudaDeviceProp prop;
