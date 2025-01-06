@@ -21,56 +21,50 @@
 #define tX 4
 #define tY 3
 
-__device__ void calcAvg()
+__device__ void binaryTree()
 {
 
 }
 
-__device__ void calcMin()
+__global__ void kernel(int *d_A, int *d_OutArr, double *d_Avg, int *d_Max, int *d_Min, int matrix_size)
 {
+    int x, y;
+    int *sum;
+    int idx;
 
-}
+    x = threadIdx.x + blockIdx.x * blockDim.x;
+    y = threadIdx.y + blockIdx.y * blockDim.y;
 
-__device__ void findMax()
-{
+    *d_Min = 0;
 
-}
+    idx = y * matrix_size + x;
 
-__device__ void checkMax()
-{
-
-}
-
-__device__ void createB()
-{
-
-}
-
-__device__ void createC()
-{
-
-}
-
-__global__ void kernel()
-{
-    
+    atomicAdd(d_Min, d_A[idx]);
+    atomicMax(d_Max, d_A[idx]);
 }
 
 int main(int argc, char *argv[])
 {
-    int **A, **B, **C;
-    int *d_A, *d_N, *d_outArray, *d_max, *d_min;
-    float *d_avg;
-    float elapsedTime;
+    int **h_A;
+    double **h_OutArr;
+    int *d_A, *d_OutArr, *d_Max, *d_Min;
+    double *d_Avg;
+    double elapsedTime;
     int i, j;
     int matrix_size, grid_sizeX, grid_sizeY, block_sizeX, block_sizeY;
     int max_threads, max_block_dimX, max_block_dimY, max_grid_dimX, max_grid_dimY;
     int total_threads;
-    FILE *fpA, *fpB, *fpC;
+    FILE *fpA, *fpOutArr;
     cudaEvent_t start, stop;
     cudaError_t err;
     cudaDeviceProp prop;
-    size_t bytes;
+    size_t intBytes, doubleBytes;
+
+    if (argc != 3)
+    {
+        printf("Usage: %s A.txt OutArr.txt\n", argv[0]);
+        exit(1);
+    }
 
     matrix_size = N;
     grid_sizeX = blX;
@@ -132,17 +126,10 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    fpB = fopen(argv[2], "w");
-    if (fpB == NULL) 
+    fpOutArr = fopen(argv[2], "w");
+    if (fpOutArr == NULL) 
     {
         printf("Cannot open file %s\n", argv[2]);
-        exit(1);
-    }
-
-    fpC = fopen(argv[3], "w");
-    if (fpC == NULL) 
-    {
-        printf("Cannot open file %s\n", argv[3]);
         exit(1);
     }
 
@@ -157,28 +144,21 @@ int main(int argc, char *argv[])
     printf("Block size  : %d x %d\n", block_sizeX, block_sizeY);
     printf("------------------------------------------------\n");
 
-    A = (int **) malloc(matrix_size * sizeof(int *));
-    B = (int **) malloc(matrix_size * sizeof(int *));
-    C = (int **) malloc(matrix_size * sizeof(int *));
+    h_A = (int **) malloc(matrix_size * sizeof(int *));
+    h_OutArr = (double **) malloc(matrix_size * sizeof(double *));
     
     for (i = 0; i < matrix_size; i++) 
     {
-        A[i] = (int *) malloc(matrix_size * sizeof(int));
-        if (A[i] == NULL) 
+        h_A[i] = (int *) malloc(matrix_size * sizeof(int));
+        if (h_A[i] == NULL) 
         {
             printf("Memory allocation failed for A[%d]\n", i);
             exit(1);
         }
-        B[i] = (int *) malloc(matrix_size * sizeof(int));
-        if (B[i] == NULL) 
+        h_OutArr[i] = (double *) malloc(matrix_size * sizeof(double));
+        if (h_OutArr[i] == NULL) 
         {
-            printf("Memory allocation failed for B[%d]\n", i);
-            exit(1);
-        }
-        C[i] = (int *) malloc(matrix_size * sizeof(int));
-        if (C[i] == NULL) 
-        {
-            printf("Memory allocation failed for C[%d]\n", i);
+            printf("Memory allocation failed for OutArr[%d]\n", i);
             exit(1);
         }
     }
@@ -189,32 +169,37 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < matrix_size; j++)
         {
-            A[i][j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
-            A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
-            B[i][j] = 0;
-            C[i][j] = 0;
+            h_A[i][j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
+            h_A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
+            h_OutArr = 0.0;
         }
     }
 
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
-    bytes = matrix_size * matrix_size * sizeof(int);
+    intBytes = matrix_size * matrix_size * sizeof(int);
+    doubleBytes = matrix_size * matrix_size * sizeof(double);
 
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    err = cudaMalloc((void **) &d_A, bytes);
+    err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_outArray, bytes);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_outArray, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_N, sizeof(int));
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_N, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_avg, sizeof(float));
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_avg, sizeof(float)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_max, sizeof(int));
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_max, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_min, sizeof(int)); 
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_min, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_OutArr, doubleBytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_OutArray, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_Avg, sizeof(double));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Avg, sizeof(float)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_Max, sizeof(int));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Max, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_Min, sizeof(int)); 
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Min, sizeof(int)) failed."); exit(1); }
 
+    err = cudaMemcpy(d_A, A, intBytes, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
+    
+    dim3 dimBlock(block_sizeX, block_sizeY);
+    dim3 dimGrid(grid_sizeX, grid_sizeY);
+
+    kernel<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_Avg, d_Max, d_Min, matrix_size);
 
     err = cudaEventRecord(stop, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop, 0) failed."); exit(1); }
@@ -222,7 +207,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
     err = cudaEventElapsedTime(&elapsedTime, start, stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime, start, stop) failed."); exit(1); }
-    printf ("Time for the kernel: %f ms\n", elapsedTime);
+    printf ("Time for the kernel: %lf ms\n", elapsedTime);
 
 /********************************************/
 
