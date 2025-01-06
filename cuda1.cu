@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < matrix_size; j++)
         {
             fprintf(fpA, "%4d ", h_A[i][j]);
-            fprintf(fpOutArr, "%4d ", h_OutArr[i][j]);
+            fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
         }
 
         fprintf(fpA, "\n");
