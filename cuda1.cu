@@ -88,8 +88,8 @@ int main(int argc, char *argv[])
 
     printf("Device name: %s\n", prop.name);
     printf("Max threads per block: %d\n", max_threads);
-    printf("Max block dimensions: (%d, %d, %d)\n", max_block_dimX, max_block_dimY);
-    printf("Max grid dimensions: (%d, %d, %d)\n", max_grid_dimX, max_grid_dimY);
+    printf("Max block dimensions: (%d, %d)\n", max_block_dimX, max_block_dimY);
+    printf("Max grid dimensions: (%d, %d)\n", max_grid_dimX, max_grid_dimY);
     printf("-----------------------------------\n");
 
     total_threads = block_sizeX * block_sizeY;
