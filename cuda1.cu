@@ -184,15 +184,15 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    err = cudaMalloc((void **) &d_A, intBytes);
+    err = cudaMalloc(&d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_OutArr, doubleBytes);
+    err = cudaMalloc(&d_OutArr, doubleBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_OutArray, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_Avg, sizeof(double));
+    err = cudaMalloc(&d_Avg, sizeof(double));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Avg, sizeof(float)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_Max, sizeof(int));
+    err = cudaMalloc(&d_Max, sizeof(int));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Max, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_Min, sizeof(int)); 
+    err = cudaMalloc(&d_Min, sizeof(int)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Min, sizeof(int)) failed."); exit(1); }
 
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
