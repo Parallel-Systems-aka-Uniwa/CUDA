@@ -197,10 +197,7 @@ int main(int argc, char *argv[])
 
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
-    cudaMemcpy(d_OutArr, h_OutArr, doubleBytes, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Avg, &h_Avg, sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Max, &h_Max, sizeof(int), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_Min, &h_Min, sizeof(int), cudaMemcpyHostToDevice);
+
 
     dim3 dimBlock(block_sizeX, block_sizeY);
     dim3 dimGrid(grid_sizeX, grid_sizeY);
