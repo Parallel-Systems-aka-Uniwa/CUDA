@@ -14,17 +14,16 @@
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
-#include "lock.h"
 
 #define N 1000000
 #define nThreads 1024
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ calcAvg(int *d_A, double *d_avg)
+__global__ void calcAvg(int *d_A, double *d_avg)
 {
     __shared__ int sA[nThreads];
 
-    int sum = 0;
+    int *sum;
 
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int sindex = threadIdx.x;
@@ -34,6 +33,7 @@ __global__ calcAvg(int *d_A, double *d_avg)
     __syncthreads();
 
     int i = blockDim.x / 2;
+    *sum = 0;
 
     while (i != 0)
     {
@@ -47,20 +47,20 @@ __global__ calcAvg(int *d_A, double *d_avg)
     if (sindex == 0)
         atomicAdd(sum, sindex[0]);
 
-    d_avg = sum / N;
+    d_avg = (double *) sum / N;
 }
 
-__global__ findMax()
+__global__ void findMax()
 {
 
 }
 
-__global__ createB()
+__global__ void createB()
 {
 
 }
 
-__global__ createC()
+__global__ void createC()
 {
 
 }
@@ -141,8 +141,8 @@ int main(int argc, char *argv[])
     printf("Threads per Block  : %d\n", threadsPerBlock);
     printf("------------------------------------------------\n");
 
-    intBytes = n * n sizeof(int);
-    doubleBytes = n * n sizeof(double);
+    intBytes = n * n * sizeof(int);
+    doubleBytes = n * n * sizeof(double);
 
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
@@ -215,6 +215,7 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
+    arr = 'B';
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
@@ -243,12 +244,6 @@ int main(int argc, char *argv[])
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-
-    for (i = 0; i < n; i++)
-    {
-        free(h_A[i]);
-        free(h_OutArr[i]);
-    }
 
     free(h_A);
     free(h_OutArr);
