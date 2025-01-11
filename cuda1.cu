@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
-#include "book.h"
 #include "lock.h"
 
 #define N 1000000
