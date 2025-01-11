@@ -14,39 +14,13 @@
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
+#include "book.h"
+#include "lock.h"
 
 #define N 10
-#define blX 3
-#define blY 2
-#define tX 4
-#define tY 3
+#define BL 5
+#define T 3
 
-__device__ void binaryTree()
-{
-
-}
-
-__global__ void kernel(int *d_A, double *d_OutArr, double *d_Avg, int *d_Max, int *d_Min, bool *d_checkMax)
-{
-    __shared__ int s_A[tX][tY];
-    __shared__ double s_OutArr[tX][tY];
-    
-    int x, y;
-    int i, j;
-    int sum;
-    int idx;
-
-    x = threadIdx.x + blockIdx.x * blockDim.x;
-    y = threadIdx.y + blockIdx.y * blockDim.y;
-
-    idx = y * N + x;
-    sum = 0;
-
-    for (int i = 0; i < tX; i++)
-        for (int j = 0; j < tY; j++)
-            s_A[i][j] = d_A[(y + i) * N + (x + j)];
-    __syncthreads();
-}
 
 int main(int argc, char *argv[])
 {
@@ -54,17 +28,14 @@ int main(int argc, char *argv[])
     double *h_OutArr;
     double h_Avg;
     int h_Max, h_Min;
-    bool h_checkMax;
-    bool *d_checkMax;
     int *d_A, *d_OutArr, *d_Max, *d_Min;
     double *d_Avg;
-    float elapsedTime;
     int i, j;
-    int matrix_size, grid_sizeX, grid_sizeY, block_sizeX, block_sizeY;
-    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
-    int total_threads;
+    int n, threadsPerBlock, blocksPerGrid;
     int intBytes, doubleBytes;
+    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     FILE *fpA, *fpOutArr;
+    float elapsedTime1, elapsedTime2, elapsedTime3, elapsedTimeAll;
     cudaEvent_t start, stop;
     cudaError_t err;
     cudaDeviceProp prop;
@@ -75,19 +46,19 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    matrix_size = N;
-    grid_sizeX = blX;
-    grid_sizeY = blY;
-    block_sizeX = tX;
-    block_sizeY = tY;
+    n = N;
+    threadsPerBlock = T;
+    blocksPerGrid = BL;
 
     cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
 
     max_threads = prop.maxThreadsPerBlock;
     max_block_dimX = prop.maxThreadsDim[0];
     max_block_dimY = prop.maxThreadsDim[1];
+    max_block_dimZ = prop.maxThreadsDim[2];
     max_grid_dimX = prop.maxGridSize[0];
     max_grid_dimY = prop.maxGridSize[1];
+    max_grid_dimZ = prop.maxGridSize[2];
 
     printf("--------------- Device Properties ---------------\n");
     printf("Device name           : %s\n", prop.name);
@@ -96,17 +67,15 @@ int main(int argc, char *argv[])
     printf("Max grid dimensions   : %d x %d x %d\n", max_grid_dimX, max_grid_dimY, max_grid_dimZ);
     printf("-------------------------------------------------\n");
 
-    total_threads = block_sizeX * block_sizeY;
-
-    if (block_sizeX < 1 || block_sizeY < 1)
+    if (n < 1)
+    { printf("Error --> Matrix size must be at least 1\n"); exit(1); }
+    if (threadsPerBlock < 1)
     { printf("Error --> Threads per block (block size) must be at least 1\n"); exit(1); }
-    if (grid_sizeX < 1 || grid_sizeY < 1)
+    if (blocksPerGrid < 1)
     { printf("Error --> Blocks per grid (grid size) must be at least 1\n"); exit(1); }
-    if (block_sizeX > max_block_dimX || block_sizeY > max_block_dimY)
+    if (threadsPerBlock > max_threads)
     { printf("Error --> Threads per block (block size) exceed maximum allowed for %s\n", prop.name); exit(1); }
-    if (total_threads > max_threads)
-    { printf("Error --> Total threads per block exceed maximum allowed for %s\n", prop.name); exit(1); }
-    if (grid_sizeX > max_grid_dimX || grid_sizeY > max_grid_dimY)
+    if (blocksPerGrid > max_grid_dimX)
     { printf("Error --> Blocks per grid (grid size) exceed maximum allowed for %s\n", prop.name); exit(1); }
 
     fpA = fopen(argv[1], "w");
@@ -120,13 +89,13 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
 
     printf("--------------- Input Parameters ---------------\n");
-    printf("Matrix size : %d x %d\n", matrix_size, matrix_size);
-    printf("Grid size   : %d x %d\n", grid_sizeX, grid_sizeY);
-    printf("Block size  : %d x %d\n", block_sizeX, block_sizeY);
+    printf("Matrix size        : %d x %d\n", n, n);
+    printf("Blocks per Grid    : %d\n", blocksPerGrid);
+    printf("Threads per Block  : %d\n", threadsPerBlock);
     printf("------------------------------------------------\n");
 
-    intBytes = matrix_size * matrix_size * sizeof(int);
-    doubleBytes = matrix_size * matrix_size * sizeof(double);
+    intBytes = n * n sizeof(int);
+    doubleBytes = n * n sizeof(double);
 
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
@@ -136,16 +105,15 @@ int main(int argc, char *argv[])
     h_Avg = 0.0;
     h_Max = 0;
     h_Min = 0;
-    h_checkMax = false;
 
     srand(time(NULL));
 
-    for (i = 0; i < matrix_size; i++)
-        for (j = 0; j < matrix_size; j++)
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
         {
-            h_A[i * matrix_size + j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
-            h_A[i * matrix_size + j] = h_A[i * matrix_size + j] >= 0 ? h_A[i * matrix_size + j] + 10 : h_A[i * matrix_size + j] - 10;  // Τυχαία επιλογή προσήμου
-            h_OutArr[i * matrix_size + j] = 0.0;
+            h_A[i * n + j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
+            h_A[i * n + j] = h_A[i * n + j] >= 0 ? h_A[i * n + j] + 10 : h_A[i * n + j] - 10;  // Τυχαία επιλογή προσήμου
+            h_OutArr[i * n + j] = 0.0;
         }
 
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
@@ -179,10 +147,7 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(d_checkMax, &h_checkMax, sizeof(bool), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_checkMax, &h_checkMax, sizeof(bool), cudaMemcpyHostToDevice) failed."); exit(1); }
 
-    dim3 dimBlock(block_sizeX, block_sizeY);
-    dim3 dimGrid(grid_sizeX, grid_sizeY);
-
-    kernel<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_Avg, d_Max, d_Min, d_checkMax);
+    kernel<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_OutArr, d_Avg, d_Max, d_Min, d_checkMax);
 
     err = cudaEventRecord(stop, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop, 0) failed."); exit(1); }
@@ -197,9 +162,9 @@ int main(int argc, char *argv[])
     printf("Min: %d\n", h_Min);
 /********************************************/
 
-    for (i = 0; i < matrix_size; i++)
+    for (i = 0; i < n; i++)
     {
-        for (j = 0; j < matrix_size; j++)
+        for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i][j]);
             fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
@@ -215,7 +180,7 @@ int main(int argc, char *argv[])
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 
-    for (i = 0; i < matrix_size; i++)
+    for (i = 0; i < n; i++)
     {
         free(h_A[i]);
         free(h_OutArr[i]);
@@ -229,6 +194,7 @@ int main(int argc, char *argv[])
     cudaFree(d_Avg);
     cudaFree(d_Max);
     cudaFree(d_Min);
+    cudaFree(d_checkMax);
 
     return 0;
 }
