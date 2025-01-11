@@ -47,7 +47,7 @@ __global__ void calcAvg(int *d_A, double *d_avg)
     if (sindex == 0)
         atomicAdd(sum, sindex[0]);
 
-    d_avg = (double *) sum / N;
+    *d_avg = (double) sum / N;
 }
 
 __global__ void findMax()
@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < n; j++)
         {
-            fprintf(fpA, "%4d ", h_A[i][j]);
+            fprintf(fpA, "%4d ", h_A[i * n + j]);
           //  fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
         }
 
