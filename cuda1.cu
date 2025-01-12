@@ -34,7 +34,7 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
     while (i != 0) 
     {
         if (cacheIndex < i)
-            cacheIndex[cacheIndex] += cache[cacheIndex + i];
+            cache[cacheIndex] += cache[cacheIndex + i];
         __syncthreads();
         i /= 2;
     }
