@@ -66,7 +66,6 @@ __global__ void findMax(int *d_A, int *d_max)
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int totalElements = N * N;
     int tid = row * N + col; // Global index for 2D array
 
     if (row < N && col < N)  // Ensure within bounds
