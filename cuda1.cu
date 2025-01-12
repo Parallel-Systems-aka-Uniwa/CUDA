@@ -42,10 +42,7 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
 
     if (cacheIndex == 0)
         atomicAdd(d_sum, cache[0]);
-}
 
-__global__ void calcAvg(int *d_sum, double *d_avg)
-{
     if (threadIdx.x == 0 && blockIdx.x == 0)
         *d_avg = (double) (*d_sum) / (N * N);
 }
@@ -205,8 +202,6 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
     add<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
-    cudaDeviceSynchronize();
-    calcAvg<<<1, 1>>>(d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
