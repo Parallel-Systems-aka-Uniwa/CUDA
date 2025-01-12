@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
     err = cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll) failed."); exit(1); }
 
-    printf("Time for the kernel: %f\n", elapsedTimeAll);
+    printf("Time for the kernel: %f ms\n", elapsedTimeAll);
 
     for (i = 0; i < n; i++)
     {
