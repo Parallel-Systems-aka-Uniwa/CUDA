@@ -19,7 +19,7 @@
 #define nThreads 1
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
+__global__ void add(int *d_A, int *d_sum, double *d_avg)
 {
     __shared__ int cache[nThreads];
 
@@ -42,9 +42,12 @@ __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
 
     if (cacheIndex == 0)
         atomicAdd(d_sum, cache[0]);
+}
 
-    if (cacheIndex == 0 && blockIdx.x == 0)
-        *d_avg = (double) *d_sum / (N * N);
+__global__ calcAvg(int *d_sum, double *d_avg)
+{
+    if (threadIdx.x == 0 && blockIdx.x == 0)
+        *d_avg = (double) (*d_sum) / (N * N);
 }
 
 __global__ void findMax()
@@ -201,7 +204,8 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    calcAvg<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
+    add<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
+    calcAvg<<<1, 1>>>(d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
