@@ -118,6 +118,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
 
     int cacheIndex = threadIdx.x;
 
+    double m;
+    int amax;
+
     if (tid < totalElements)
         sharedMin[cacheIndex] = d_A[tid];
     else
@@ -136,12 +139,17 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     }
 
     if (cacheIndex == 0)
-        atomicMin(d_min, sharedMin[0]);
+        atomicMin(d_min, (float) sharedMin[0]);
     
     __syncthreads();
 
     if (tid < totalElements)
-        d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_max;
+    {
+        m = *d_avg;
+        amax = *d_max;
+
+        d_outArr[tid] = (m - (float) d_A[tid]) / (float) amax;
+    }
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -365,7 +373,7 @@ int main(int argc, char *argv[])
 
     printf("Time for the kernel: %f ms\n", elapsedTimeAll);
 
-    fprintf(fpOutArr, "Array %c:\n", arr);
+    fprintf(fpOutArr, "Array %c\n", arr);
 
     for (i = 0; i < n; i++)
     {
