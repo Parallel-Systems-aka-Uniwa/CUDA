@@ -58,9 +58,39 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
 }
 
 
-__global__ void findMax()
+__global__ void findMax(int *d_A, int *d_max)
 {
+    __shared__ int cache[nThreads];  // Shared memory for each block
 
+    // Calculate global row and column index
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
+    int totalElements = N * N;
+    int tid = row * N + col; // Global index for 2D array
+
+    if (row < N && col < N)  // Ensure within bounds
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
+    else
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
+
+    __syncthreads();  // Synchronize threads in the block
+
+    // Perform parallel reduction within the block
+    int i = blockDim.x * blockDim.y / 2; 
+    while (i != 0) 
+    {
+        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+            cache[threadIdx.x + threadIdx.y * blockDim.x] = 
+                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+        __syncthreads();  // Synchronize threads in the block
+        i /= 2;
+    }
+
+    // Atomic max to the global max if this thread is the first in the block
+    if (threadIdx.x == 0 && threadIdx.y == 0) 
+        atomicMax(d_max, cache[0]);
 }
 
 __global__ void createB()
@@ -222,19 +252,24 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
+    printf("Average: %lf\n", *h_avg);
+
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsedTime1, start, stop);
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
-
-    printf("Average: %lf\n", *h_avg);
-    printf("Sum: %d\n", *h_sum);
 
 /* 2o kernel launch */
 
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
+    findMax<<<dimGrid, dimBlock>>>(d_A, d_max);
+
+    err = cudaMemcpy(h_max, d_max, sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_max, d_max, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+    printf("Max: %d\n", *h_max);
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
