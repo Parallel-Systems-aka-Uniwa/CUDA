@@ -92,12 +92,59 @@ __global__ void findMax(int *d_A, int *d_max)
         atomicMax(d_max, cache[0]);
 }
 
-__global__ void createB()
+// Βij = (m–Aij)/amax
+__global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, double *d_avg)
 {
+    __shared__ int sharedMin[nThreads];
 
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int totalElements = N * N;
+
+    int cacheIndex = threadIdx.x;
+
+    if (tid < totalElements)
+        sharedMin[cacheIndex] = d_A[tid];
+    else
+        sharedMin[cacheIndex] = 100000000;
+
+    __syncthreads();
+
+    int i = blockDim.x / 2;
+
+    while (i != 0)
+    {
+        if (cacheIndex < i)
+            sharedMin[cacheIndex] = min(sharedMin[cacheIndex], sharedMin[cacheIndex + i]);
+        __syncthreads();
+        i /= 2;
+    }
+
+    if (cacheIndex == 0)
+        atomicMin(d_min, sharedMin[0]);
+    
+    __syncthreads();
+
+    if (tid < totalElements)
+        d_outArr[tid] = (m - d_A[tid]) / (double) *d_max;
 }
 
-__global__ void createC()
+__device__ void atomicMin(double *address, double val)
+{
+    int *address_as_i = (int *) address;
+    int old = *address_as_i, assumed;
+
+    do
+    {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed,
+        __double_as_int(val + __int_as_double(assumed)));
+    } 
+    while (assumed != old);
+    
+}
+
+// Cij = (Aij+Ai(j+1)+Ai(j-1))/3
+__global__ void createC(int *d_A, double *d_outArr)
 {
 
 }
@@ -280,7 +327,28 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    arr = 'B';
+    if (1)//(*h_max > N * (*h_avg))
+    {
+        arr = 'B';
+
+        createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_min, d_max, d_avg);
+
+        err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+        err = cudaMemcpy(h_min, d_min, sizeof(double), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_min, d_min, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+        printf("Min: %lf\n", *h_min);
+    }
+    else
+    {
+        arr = 'C';
+
+        createC<<<nBlocks, nThreads>>>(d_A, d_OutArr);
+
+        err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+    }
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
@@ -297,16 +365,18 @@ int main(int argc, char *argv[])
 
     printf("Time for the kernel: %f ms\n", elapsedTimeAll);
 
+    fprintf(fpOutArr, "Array %c:\n", arr);
+
     for (i = 0; i < n; i++)
     {
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-          //  fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
+            fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
         }
 
         fprintf(fpA, "\n");
-        //fprintf(fpOutArr, "\n");
+        fprintf(fpOutArr, "\n");
     }
 
     fclose(fpA);
