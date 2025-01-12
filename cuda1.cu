@@ -43,7 +43,7 @@ __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
     if (cacheIndex == 0)
         atomicAdd(d_sum, cache[0]);
 
-    if (cacheIndex == 0)
+    if (cacheIndex == 0 && blockIdx.x == 0)
         *d_avg = (double) *d_sum / (N * N);
 }
 
