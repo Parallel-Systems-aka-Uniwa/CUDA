@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
     dim3 dimBlock(nThreads, nThreads);
-    dim3 dimGrid(N/nBlocks, N/nBlocks);
+    dim3 dimGrid(nBlocks, nBlocks);
 
     add<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
 
