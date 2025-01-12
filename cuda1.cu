@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
 
     calcAvg<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
 
-    err = cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     cudaEventRecord(stop,0);
@@ -215,7 +215,6 @@ int main(int argc, char *argv[])
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
     elapsedTimeAll += elapsedTime1;
 
-    cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     printf("Average: %lf\n", *h_avg);
 
 /* 2o kernel launch */
