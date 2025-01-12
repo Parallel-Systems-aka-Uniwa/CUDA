@@ -92,26 +92,24 @@ __global__ void findMax(int *d_A, int *d_max)
         atomicMax(d_max, cache[0]);
 }
 
-__device__ void atomicMinDouble(double *address, double val)
+__device__ void atomicMin(float *address, float val)
 {
     int *address_as_i = (int *) address;
     int old = *address_as_i, assumed;
-
-    // Convert the double to its integer representation
-    int new_val = __double_as_int(val);
 
     do
     {
         assumed = old;
         // Perform atomicCAS on the integer representation
-        old = atomicCAS(address_as_i, assumed, new_val);
+        old = atomicCAS(address_as_i, assumed, 
+        __float_as_int(val + __int_as_float(assumed)));
     } 
     while (assumed != old);
 }
 
 
 // Βij = (m–Aij)/amax
-__global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, double *d_avg)
+__global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, double *d_avg)
 {
     __shared__ int sharedMin[nThreads];
 
@@ -138,7 +136,7 @@ __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, d
     }
 
     if (cacheIndex == 0)
-        atomicMinDouble(d_min, sharedMin[0]);
+        atomicMin(d_min, sharedMin[0]);
     
     __syncthreads();
 
@@ -159,8 +157,9 @@ int main(int argc, char *argv[])
     int *h_max, *h_sum;
     int *d_A, *d_max, *d_sum;
     double *h_OutArr;
-    double *h_avg, *h_min;
-    double *d_OutArr, *d_avg, *d_min;
+    double *h_avg;
+    double *d_OutArr, *d_avg;
+    float *h_min, *d_min;
 
     int n, threadsPerBlock, blocksPerGrid;
     int intBytes, doubleBytes;
@@ -243,7 +242,7 @@ int main(int argc, char *argv[])
     if (h_avg == NULL) { printf("Error --> Memory allocation failed for avg.\n"); exit(1); }
     h_max = (int *) malloc(sizeof(int));
     if (h_max == NULL) { printf("Error --> Memory allocation failed for max.\n"); exit(1); }
-    h_min = (double *) malloc(sizeof(double));
+    h_min = (double *) malloc(sizeof(float));
     if (h_min == NULL) { printf("Error --> Memory allocation failed for min.\n"); exit(1); }
     h_sum = (int *) malloc(sizeof(int));
     if (h_sum == NULL) { printf("Error --> Memory allocation failed for sum.\n"); exit(1); }
@@ -276,7 +275,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_avg, sizeof(float)) failed."); exit(1); }
     err = cudaMalloc((void **) &d_max, sizeof(int));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_max, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_min, sizeof(int)); 
+    err = cudaMalloc((void **) &d_min, sizeof(float)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_min, sizeof(int)) failed."); exit(1); }
 
 /* 1o kernel launch */
@@ -298,8 +297,6 @@ int main(int argc, char *argv[])
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
-    err = cudaMemcpy(h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     printf("Average: %lf\n", *h_avg);
 
@@ -338,10 +335,10 @@ int main(int argc, char *argv[])
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
-        err = cudaMemcpy(h_min, d_min, sizeof(double), cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_min, d_min, sizeof(float), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_min, d_min, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("Min: %lf\n", *h_min);
+        printf("Min: %f\n", *h_min);
     }
     else
     {
