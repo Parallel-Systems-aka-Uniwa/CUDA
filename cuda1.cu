@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
     elapsedTimeAll += elapsedTime1;
 
     cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
-    printf("Average: %lf\n", h_avg);
+    printf("Average: %lf\n", *h_avg);
 
 /* 2o kernel launch */
 
