@@ -97,15 +97,18 @@ __device__ void atomicMinDouble(double *address, double val)
     int *address_as_i = (int *) address;
     int old = *address_as_i, assumed;
 
+    // Convert the double to its integer representation
+    int new_val = __double_as_int(val);
+
     do
     {
         assumed = old;
-        old = atomicCAS(address_as_i, assumed,
-        __double_as_int(val + __int_as_double(assumed)));
+        // Perform atomicCAS on the integer representation
+        old = atomicCAS(address_as_i, assumed, new_val);
     } 
     while (assumed != old);
-    
 }
+
 
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, double *d_avg)
