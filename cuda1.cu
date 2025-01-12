@@ -15,7 +15,7 @@
 #include <math.h>
 #include <cuda.h>
 
-#define N 1000000
+#define N 1000
 #define nThreads 1024
 #define nBlocks (int)ceil((float)N/nThreads)
 
@@ -267,12 +267,17 @@ int main(int argc, char *argv[])
 
     free(h_A);
     free(h_OutArr);
+    free(h_avg);
+    free(h_max);
+    free(h_min);
+    free(h_sum);
 
     cudaFree(d_A);
     cudaFree(d_OutArr);
     cudaFree(d_avg);
     cudaFree(d_max);
     cudaFree(d_min);
+    cudaFree(d_sum);
 
     return 0;
 }
