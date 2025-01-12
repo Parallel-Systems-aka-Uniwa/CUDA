@@ -140,7 +140,7 @@ __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, d
     __syncthreads();
 
     if (tid < totalElements)
-        d_outArr[tid] = (m - d_A[tid]) / (double) *d_max;
+        d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_max;
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
