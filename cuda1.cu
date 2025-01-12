@@ -15,8 +15,8 @@
 #include <math.h>
 #include <cuda.h>
 
-#define N 10
-#define nThreads 2
+#define N 2
+#define nThreads 1
 #define nBlocks (int)ceil((float)N/nThreads)
 
 __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
