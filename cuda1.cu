@@ -92,6 +92,21 @@ __global__ void findMax(int *d_A, int *d_max)
         atomicMax(d_max, cache[0]);
 }
 
+__device__ void atomicMinDouble(double *address, double val)
+{
+    int *address_as_i = (int *) address;
+    int old = *address_as_i, assumed;
+
+    do
+    {
+        assumed = old;
+        old = atomicCAS(address_as_i, assumed,
+        __double_as_int(val + __int_as_double(assumed)));
+    } 
+    while (assumed != old);
+    
+}
+
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, double *d_avg)
 {
@@ -126,21 +141,6 @@ __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, d
 
     if (tid < totalElements)
         d_outArr[tid] = (m - d_A[tid]) / (double) *d_max;
-}
-
-__device__ void atomicMinDouble(double *address, double val)
-{
-    int *address_as_i = (int *) address;
-    int old = *address_as_i, assumed;
-
-    do
-    {
-        assumed = old;
-        old = atomicCAS(address_as_i, assumed,
-        __double_as_int(val + __int_as_double(assumed)));
-    } 
-    while (assumed != old);
-    
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -372,7 +372,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            fprintf(fpOutArr, "%4lf ", h_OutArr[i][j]);
+            fprintf(fpOutArr, "%4lf ", h_OutArr[i * n + j]);
         }
 
         fprintf(fpA, "\n");
