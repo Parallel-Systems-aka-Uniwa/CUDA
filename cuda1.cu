@@ -205,6 +205,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
     add<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
+    cudaDeviceSynchronize();
     calcAvg<<<1, 1>>>(d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
