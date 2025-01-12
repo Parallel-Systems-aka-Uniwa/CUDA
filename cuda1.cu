@@ -19,32 +19,31 @@
 #define nThreads 2
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void add(int *d_A, int *d_sum, double *d_avg)
+__global__ void add(int *d_A, int *d_sum, double *d_avg) 
 {
-    __shared__ int cache[nThreads];
+    __shared__ int cache[nThreads]; 
 
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int cacheIndex = threadIdx.x;
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;  
+    int cacheIndex = threadIdx.x;               
+    int totalElements = N * N;
 
-    cache[cacheIndex] = d_A[tid];
-
+  
+    cache[cacheIndex] = (tid < totalElements) ? d_A[tid] : 0; 
     __syncthreads();
 
-    int i = blockDim.x / 2;
 
-    while (i != 0)
-    {
+    for (int i = blockDim.x / 2; i > 0; i /= 2) {
         if (cacheIndex < i)
             cache[cacheIndex] += cache[cacheIndex + i];
         __syncthreads();
-        i /= 2;
     }
 
-    if (cacheIndex == 0)
+    if (cacheIndex == 0) 
         atomicAdd(d_sum, cache[0]);
 
     if (threadIdx.x == 0 && blockIdx.x == 0)
-        *d_avg = (double) (*d_sum) / (N * N);
+        *d_avg = (double)(*d_sum) / (rows * cols);
+   
 }
 
 __global__ void findMax()
