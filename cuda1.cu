@@ -40,6 +40,8 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
 
     if (cacheIndex == 0) 
         atomicAdd(d_sum, cache[0]);
+    
+    __syncthreads();
 
     if (threadIdx.x == 0 && blockIdx.x == 0)
         *d_avg = (double)(*d_sum) / totalElements;
