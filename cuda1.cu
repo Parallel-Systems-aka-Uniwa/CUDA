@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
     if (h_avg == NULL) { printf("Error --> Memory allocation failed for avg.\n"); exit(1); }
     h_max = (int *) malloc(sizeof(int));
     if (h_max == NULL) { printf("Error --> Memory allocation failed for max.\n"); exit(1); }
-    h_min = (double *) malloc(sizeof(float));
+    h_min = (float *) malloc(sizeof(float));
     if (h_min == NULL) { printf("Error --> Memory allocation failed for min.\n"); exit(1); }
     h_sum = (int *) malloc(sizeof(int));
     if (h_sum == NULL) { printf("Error --> Memory allocation failed for sum.\n"); exit(1); }
