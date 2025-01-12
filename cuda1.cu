@@ -21,31 +21,42 @@
 
 __global__ void add(int *d_A, int *d_sum, double *d_avg) 
 {
-    __shared__ int cache[nThreads]; 
+    __shared__ int cache[nThreads];  // Shared memory for each block
 
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;  
-    int cacheIndex = threadIdx.x;               
+    // Calculate global row and column index
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    
     int totalElements = N * N;
+    int tid = row * N + col; // Global index for 2D array
 
-    cache[cacheIndex] = d_A[tid]; 
-    __syncthreads();
+    if (row < N && col < N)  // Ensure within bounds
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
+    else
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
 
-    int i = blockDim.x/2;
+    __syncthreads();  // Synchronize threads in the block
+
+    // Perform parallel reduction within the block
+    int i = blockDim.x * blockDim.y / 2; 
     while (i != 0) 
     {
-        if (cacheIndex < i)
-            cache[cacheIndex] += cache[cacheIndex + i];
-        __syncthreads();
+        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+            cache[threadIdx.x + threadIdx.y * blockDim.x] += 
+                cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+        __syncthreads();  // Synchronize threads in the block
         i /= 2;
     }
 
-    if (cacheIndex == 0) 
+    // Atomic addition to the global sum if this thread is the first in the block
+    if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicAdd(d_sum, cache[0]);
 
-    if (threadIdx.x == 0 && blockIdx.x == 0)
+    // Calculate average after reduction
+    if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0)
         *d_avg = (double)(*d_sum) / totalElements;
-   
 }
+
 
 __global__ void findMax()
 {
@@ -201,7 +212,10 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    add<<<nBlocks, nThreads>>>(d_A, d_sum, d_avg);
+    dim3 dimBlock(nThreads, nThreads);
+    dim3 dimGrid(N/nBlocks, N/nBlocks);
+
+    add<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
