@@ -15,7 +15,7 @@
 #include <math.h>
 #include <cuda.h>
 
-#define N 8
+#define N 4
 #define nThreads 2
 #define nBlocks (int)ceil((float)N/nThreads)
 
@@ -27,21 +27,20 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
     int cacheIndex = threadIdx.x;               
     int totalElements = N * N;
 
-  
-    cache[cacheIndex] = (tid < totalElements) ? d_A[tid] : 0; 
+    cache[cacheIndex] = d_A[tid]; 
     __syncthreads();
 
-
-    for (int i = blockDim.x / 2; i > 0; i /= 2) {
+    int i = blockDim.x/2;
+    while (i != 0) 
+    {
         if (cacheIndex < i)
-            cache[cacheIndex] += cache[cacheIndex + i];
+            cacheIndex[cacheIndex] += cache[cacheIndex + i];
         __syncthreads();
+        i /= 2;
     }
 
     if (cacheIndex == 0) 
         atomicAdd(d_sum, cache[0]);
-    
-    __syncthreads();
 
     if (threadIdx.x == 0 && blockIdx.x == 0)
         *d_avg = (double)(*d_sum) / totalElements;
