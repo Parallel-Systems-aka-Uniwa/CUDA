@@ -26,15 +26,7 @@ __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int cacheIndex = threadIdx.x;
 
-    int temp = 0;
-
-    while (tid < N)
-    {
-        temp += d_A[tid];
-        tid += blockDim.x * gridDim.x;
-    }
-
-    cache[cacheIndex] = temp;
+    cache[cacheIndex] = d_A[tid];
 
     __syncthreads();
 
