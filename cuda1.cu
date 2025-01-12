@@ -205,6 +205,8 @@ int main(int argc, char *argv[])
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
+    err = cudaMemcpy(h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_sum, d_sum, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
@@ -212,6 +214,7 @@ int main(int argc, char *argv[])
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
 
     printf("Average: %lf\n", *h_avg);
+    printf("Sum: %d\n", *h_sum);
 
 /* 2o kernel launch */
 
