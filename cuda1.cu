@@ -44,7 +44,7 @@ __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
         atomicAdd(d_sum, cache[0]);
 
     if (cacheIndex == 0)
-        *d_avg = (double) *d_sum / N;
+        *d_avg = (double) *d_sum / (N * N);
 }
 
 __global__ void findMax()
