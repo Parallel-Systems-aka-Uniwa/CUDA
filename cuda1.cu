@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     char arr;
     float elapsedTime1, elapsedTime2, elapsedTime3, elapsedTimeAll;
     
-    cudaEvent_t start, stop;
+    cudaEvent_t start, stop, startAll, stopAll;
     cudaError_t err;
     cudaDeviceProp prop;
 
@@ -139,6 +139,10 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
     err = cudaEventCreate(&stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
+    err = cudaEventCreate(&startAll);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&startAll) failed.\n"); exit(1); }
+    err = cudaEventCreate(&stopAll);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stopAll) failed.\n"); exit(1); }
 
     printf("--------------- Input Parameters ---------------\n");
     printf("Matrix size        : %d x %d\n", n, n);
@@ -178,6 +182,7 @@ int main(int argc, char *argv[])
         }
 
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
+    err = cudaEventRecord(startAll, 0);
 
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
@@ -213,7 +218,6 @@ int main(int argc, char *argv[])
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsedTime1, start, stop);
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
-    elapsedTimeAll += elapsedTime1;
 
     printf("Average: %lf\n", *h_avg);
 
@@ -227,7 +231,6 @@ int main(int argc, char *argv[])
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsedTime2, start, stop);
     printf ("Time for the kernel findMax<<<>>>(): %f ms\n", elapsedTime2);
-    elapsedTimeAll += elapsedTime2;
 
 /* 3o kernel launch */
 
@@ -240,9 +243,14 @@ int main(int argc, char *argv[])
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsedTime3, start, stop);
     printf ("Time for the kernel create%c<<<>>>(): %f ms\n", arr, elapsedTime3);
-    elapsedTimeAll += elapsedTime3;
 
 /********************************************/
+    err = cudaEventRecord(stopAll, 0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stopAll, 0) failed."); exit(1); }
+    err = cudaEventSynchronize(stopAll);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stopAll) failed."); exit(1); }
+    err = cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll) failed."); exit(1); }
 
     printf("Time for the kernel: %f\n", elapsedTimeAll);
 
