@@ -120,7 +120,7 @@ __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, d
     }
 
     if (cacheIndex == 0)
-        atomicMin(d_min, sharedMin[0]);
+        atomicMinDouble(d_min, sharedMin[0]);
     
     __syncthreads();
 
@@ -128,7 +128,7 @@ __global__ void createB(int *d_A, double *d_outArr, double *d_min, int *d_max, d
         d_outArr[tid] = (m - d_A[tid]) / (double) *d_max;
 }
 
-__device__ void atomicMin(double *address, double val)
+__device__ void atomicMinDouble(double *address, double val)
 {
     int *address_as_i = (int *) address;
     int old = *address_as_i, assumed;
