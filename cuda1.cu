@@ -44,7 +44,7 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
         atomicAdd(d_sum, cache[0]);
 }
 
-__global__ calcAvg(int *d_sum, double *d_avg)
+__global__ void calcAvg(int *d_sum, double *d_avg)
 {
     if (threadIdx.x == 0 && blockIdx.x == 0)
         *d_avg = (double) (*d_sum) / (N * N);
