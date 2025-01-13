@@ -105,7 +105,7 @@ __device__ void atomicMin(float *address, float val)
     {
         assumed = old;
         // Perform atomicCAS on the integer representation
-        old = atomicCAS(address_as_i, assumed, __float_as_int(min(val_as_int, assumed)));
+        old = atomicCAS(address_as_i, assumed, min(val_as_int, assumed));
     } 
     while (assumed != old);
 }
