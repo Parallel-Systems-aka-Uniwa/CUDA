@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    if (0)//(*h_amax > N * (*h_avg))
+    if (1)//(*h_amax > N * (*h_avg))
     {
         arr = 'B';
 
