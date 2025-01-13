@@ -144,7 +144,7 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
         __syncthreads();  // Synchronize threads in the block
         i /= 2;
