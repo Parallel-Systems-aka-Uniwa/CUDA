@@ -109,7 +109,7 @@ __device__ void atomicMin(float *address, float val)
 
 
 // Βij = (m–Aij)/amax
-__global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, double *d_avg)
+__global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
     __shared__ int sharedMin[nThreads];
 
@@ -146,7 +146,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     if (tid < totalElements)
     {
         if (*d_amax != 0)
-            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) amax;
+            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_max;
         else 
             d_outArr[tid] = 0.0; // Handle division by zero
     }
