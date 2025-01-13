@@ -155,7 +155,7 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
 
     // Atomic update for global minimum value using the custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, cache[0]);  // Use custom atomicMin with float values
+        atomicMin(d_bmin, cache[nThreads - 1]);  // Use custom atomicMin with float values
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
