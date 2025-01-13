@@ -162,7 +162,7 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
-__global__ void createC(int *d_A, double *d_outArr)
+__global__ void createC(int *d_A, float *d_outArr)
 {
 
 }
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
     float *h_bmin, *d_bmin;
 
     int n, threadsPerBlock, blocksPerGrid;
-    int intBytes, doubleBytes;
+    int intBytes, floatBytes;
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     int i, j;
     FILE *fpA, *fpOutArr;
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
 */
         createB<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
 
-        err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
         err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
