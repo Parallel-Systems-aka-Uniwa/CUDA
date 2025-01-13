@@ -138,14 +138,14 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
 
     // Thread 0 writes the block result to global memory
     if (cacheIndex == 0)
-        atomicMinFloat(d_min, (float)sharedMin[0]);
+        atomicMin(d_min, (float)sharedMin[0]);
 
     __syncthreads();
 
     // Compute B_{ij}
     if (tid < totalElements)
     {
-        if (amax != 0)
+        if (*d_amax != 0)
             d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) amax;
         else 
             d_outArr[tid] = 0.0; // Handle division by zero
