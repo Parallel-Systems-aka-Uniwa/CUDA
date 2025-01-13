@@ -58,7 +58,7 @@ __global__ void add(int *d_A, int *d_sum, double *d_avg)
 }
 
 
-__global__ void findMax(int *d_A, int *d_max)
+__global__ void findMax(int *d_A, int *d_amax)
 {
     __shared__ int cache[nThreads];  // Shared memory for each block
 
@@ -89,7 +89,7 @@ __global__ void findMax(int *d_A, int *d_max)
 
     // Atomic max to the global max if this thread is the first in the block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMax(d_max, cache[0]);
+        atomicMax(d_amax, cache[0]);
 }
 
 __device__ void atomicMin(float *address, float val)
@@ -109,7 +109,7 @@ __device__ void atomicMin(float *address, float val)
 
 
 // Βij = (m–Aij)/amax
-__global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, double *d_avg)
+__global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
     __shared__ int sharedMin[nThreads];
 
@@ -117,9 +117,6 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     int totalElements = N * N;
 
     int cacheIndex = threadIdx.x;
-
-    double m;
-    int amax;
 
     sharedMin[cacheIndex] = d_A[tid];
 
@@ -136,17 +133,12 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     }
 
     if (cacheIndex == 0)
-        atomicMin(d_min, (float) sharedMin[0]);
+        atomicMin(d_bmin, (float) sharedMin[0]);
     
     __syncthreads();
 
     if (tid < totalElements)
-    {
-        m = *d_avg;
-        amax = *d_max;
-
-        d_outArr[tid] = (m - (double) d_A[tid]) / (double) amax;
-    }
+        d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -159,12 +151,12 @@ int main(int argc, char *argv[])
 {
 
     int *h_A;
-    int *h_max, *h_sum;
-    int *d_A, *d_max, *d_sum;
+    int *h_amax, *h_sum;
+    int *d_A, *d_amax, *d_sum;
     double *h_OutArr;
     double *h_avg;
     double *d_OutArr, *d_avg;
-    float *h_min, *d_min;
+    float *h_bmin, *d_bmin;
 
     int n, threadsPerBlock, blocksPerGrid;
     int intBytes, doubleBytes;
@@ -245,17 +237,17 @@ int main(int argc, char *argv[])
     if (h_OutArr == NULL) { printf("Error --> Memory allocation failed for OutArr.\n"); exit(1); }
     h_avg = (double *) malloc(sizeof(double));
     if (h_avg == NULL) { printf("Error --> Memory allocation failed for avg.\n"); exit(1); }
-    h_max = (int *) malloc(sizeof(int));
-    if (h_max == NULL) { printf("Error --> Memory allocation failed for max.\n"); exit(1); }
-    h_min = (float *) malloc(sizeof(float));
-    if (h_min == NULL) { printf("Error --> Memory allocation failed for min.\n"); exit(1); }
+    h_amax = (int *) malloc(sizeof(int));
+    if (h_amax == NULL) { printf("Error --> Memory allocation failed for max.\n"); exit(1); }
+    h_bmin = (float *) malloc(sizeof(float));
+    if (h_bmin == NULL) { printf("Error --> Memory allocation failed for min.\n"); exit(1); }
     h_sum = (int *) malloc(sizeof(int));
     if (h_sum == NULL) { printf("Error --> Memory allocation failed for sum.\n"); exit(1); }
 
     *h_sum = 0;
     *h_avg = 0.0;
-    *h_max = 0;
-    *h_min = 0.0;
+    *h_amax = 0;
+    *h_bmin = 0.0;
 
     srand(time(NULL));
 
@@ -278,10 +270,10 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_sum, sizeof(int)) failed."); exit(1); }
     err = cudaMalloc((void **) &d_avg, sizeof(double));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_avg, sizeof(float)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_max, sizeof(int));
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_max, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_min, sizeof(float)); 
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_min, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_amax, sizeof(int));
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_amax, sizeof(int)) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_bmin, sizeof(float)); 
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_bmin, sizeof(int)) failed."); exit(1); }
 
 /* 1o kernel launch */
 
@@ -315,12 +307,12 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    findMax<<<dimGrid, dimBlock>>>(d_A, d_max);
+    findMax<<<dimGrid, dimBlock>>>(d_A, d_amax);
 
-    err = cudaMemcpy(h_max, d_max, sizeof(int), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_max, d_max, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
+    err = cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("Max: %d\n", *h_max);
+    printf("Max: %d\n", *h_amax);
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
@@ -342,14 +334,14 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
 */
-        createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_min, d_max, d_avg);
+        createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
-        err = cudaMemcpy(h_min, d_min, sizeof(float), cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_min, d_min, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
+        err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("Min: %f\n", *h_min);
+        printf("Min: %f\n", *h_bmin);
     }
     else
     {
