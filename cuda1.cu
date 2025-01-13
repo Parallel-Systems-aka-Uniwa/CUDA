@@ -324,15 +324,15 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    if (1)//(*h_max > N * (*h_avg))
+    if (1)//(*h_amax > N * (*h_avg))
     {
         arr = 'B';
 
 /*
         err = cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice) failed."); exit(1); }
-        err = cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
+        err = cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
 */
         createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
 
@@ -391,15 +391,15 @@ int main(int argc, char *argv[])
     free(h_A);
     free(h_OutArr);
     free(h_avg);
-    free(h_max);
-    free(h_min);
+    free(h_amax);
+    free(h_bmin);
     free(h_sum);
 
     cudaFree(d_A);
     cudaFree(d_OutArr);
     cudaFree(d_avg);
-    cudaFree(d_max);
-    cudaFree(d_min);
+    cudaFree(d_amax);
+    cudaFree(d_bmin);
     cudaFree(d_sum);
 
     return 0;
