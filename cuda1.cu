@@ -120,9 +120,6 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
-    int idx;
-    int partnerIdx;
-
     // Calculate the corresponding value for B_ij
     if (row < N && col < N)
     {
