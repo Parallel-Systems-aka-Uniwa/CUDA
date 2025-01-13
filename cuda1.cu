@@ -173,7 +173,7 @@ __global__ void createC(int *d_A, float *d_outArr)
         current = d_A[i * N + j];  // Current element
         
         // Compute Cij
-        d_outArr[i * N + j] = (current + left + right) / 3.0;
+        d_outArr[i * N + j] = (float) (current + left + right) / 3.0;
     }
 
 }
