@@ -142,7 +142,8 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
         if (threadIdx.x + threadIdx.y * blockDim.x < i) 
         {
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                min(cache[threadIdx.x + threadIdx.y * blockDim.x], cache[threadIdx.x + threadIdx.y * blockDim.x + i]);
+                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
         }
         __syncthreads();  // Synchronize threads
         i /= 2;  // Half the stride each iteration
