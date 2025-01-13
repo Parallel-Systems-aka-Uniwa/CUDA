@@ -16,7 +16,7 @@
 #include <cuda.h>
 
 #define N 4
-#define nThreads 4
+#define nThreads 2
 #define nBlocks (int)ceil((float)N/nThreads)
 
 __global__ void add(int *d_A, int *d_sum, double *d_avg) 
@@ -145,7 +145,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
         m = *d_avg;
         amax = *d_max;
 
-        d_outArr[tid] = (m - (float) d_A[tid]) / (float) amax;
+        d_outArr[tid] = (m - (double) d_A[tid]) / (double) amax;
     }
 }
 
