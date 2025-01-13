@@ -124,7 +124,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     if (tid < totalElements)
         sharedMin[cacheIndex] = d_A[tid];
     else
-        sharedMin[cacheIndex] = 100000000;
+        sharedMin[cacheIndex] = INT_MAX;
 
     __syncthreads();
 
@@ -380,11 +380,11 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            fprintf(fpOutArr, "%4lf ", h_OutArr[i * n + j]);
+            fprintf(fpOutArr, "%lf ", h_OutArr[i * n + j]);
         }
 
         fprintf(fpA, "\n");
-        fprintf(fpOutArr, "\n");
+       // fprintf(fpOutArr, "\n");
     }
 
     fclose(fpA);
