@@ -128,34 +128,31 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
         else
             d_outArr[row * N + col] = 0.0; // Handle division by zero
     }
-
+    
     int tid = row * N + col; // Global index for 2D array
 
-    // Load data into shared memory (cache)
-    if (row < N && col < N)  
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
+    if (row < N && col < N)  // Ensure within bounds
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 100000000.0;  // Avoid out-of-bound reads
 
     __syncthreads();  // Synchronize threads in the block
 
     // Perform parallel reduction within the block
-    int i = blockDim.x * blockDim.y / 2;  // Half of the total threads
+    int i = blockDim.x * blockDim.y / 2; 
     while (i != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < i) 
-        {
+        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
-        }
-        __syncthreads();  // Synchronize threads
-        i /= 2;  // Half the stride each iteration
+        __syncthreads();  // Synchronize threads in the block
+        i /= 2;
     }
 
     // Atomic update for global minimum value using the custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, cache[nThreads - 1]);  // Use custom atomicMin with float values
+        atomicMin(d_bmin, cache[0]);  // Use custom atomicMin with float values
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
