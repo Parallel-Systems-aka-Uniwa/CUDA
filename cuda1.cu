@@ -92,26 +92,30 @@ __global__ void findMax(int *d_A, int *d_amax)
         atomicMax(d_amax, cache[0]);
 }
 
+// Custom atomicMin for floats
 __device__ void atomicMin(float *address, float val)
 {
     int *address_as_i = (int *) address;
     int old = *address_as_i, assumed;
 
+    // Convert the float value to its integer representation
+    int val_as_int = __float_as_int(val);
+
     do
     {
         assumed = old;
         // Perform atomicCAS on the integer representation
-        old = atomicCAS(address_as_i, assumed, 
-        __float_as_int(val + __int_as_float(assumed)));
+        old = atomicCAS(address_as_i, assumed, min(val_as_int, assumed));
     } 
     while (assumed != old);
 }
 
 
+
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
-    __shared__ int cache[nThreads];  // Shared memory for reduction
+    __shared__ float cache[nThreads];  // Shared memory for reduction
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -129,9 +133,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
 
     // Load data into shared memory (cache)
     if (row < N && col < N)  
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;//10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
 
     __syncthreads();  // Synchronize threads in the block
 
@@ -151,7 +155,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
 
     // Atomic update for global minimum value using the custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_amax, cache[0]);  // Use custom atomicMin with float values
+        atomicMin(d_bmin, cache[0]);  // Use custom atomicMin with float values
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -351,10 +355,9 @@ int main(int argc, char *argv[])
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
-        err = cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("Min: %d\n", *h_amax);
         printf("Min: %f\n", *h_bmin);
     }
     else
