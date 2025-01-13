@@ -15,91 +15,116 @@
 #include <math.h>
 #include <cuda.h>
 
-#define N 10
-#define BL 5
-#define T 2
+#define N 8
+#define nThreads 4
+#define nBlocks (int)ceil((float)N/nThreads)
 
 int main(int argc, char *argv[])
 {
-    int **A, **A_cov;
+    int *h_A;
     int *d_A;
-    FILE *fpA, *fpA_cov;
+
+    int n, threadsPerBlock, blocksPerGrid;
+    int intbytes;
+    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     int i, j;
-    int matrix_size, grid_size, block_size;
+    FILE *fpA, *fpAcov;
+    float elapsedTime;
 
-    matrix_size = N;
-    grid_size = BL;
-    block_size = T;
-    
-    if (block_size < 1 || block_size > 1024)
-    {
-        printf("Threads per block must be between 1 to 1024.\n");
-        exit(1);
-    }
+    cudaEvent_t start, stop;
+    cudaError_t err;
+    cudaDeviceProp prop;
 
-    if (grid_size < 1 || grid_size > 65535)
-    {
-        printf("Blocks must be between 1 to 65535.\n");
-        exit(1);
-    }
-
-    if (argc != 3) 
+    if (argc != 3)
     {
         printf("Usage: %s A.txt A_cov.txt\n", argv[0]);
         exit(1);
     }
 
+    n = N;
+    threadsPerBlock = nThreads;
+    blocksPerGrid = nBlocks;
+
+    cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
+
+    max_threads = prop.maxThreadsPerBlock;
+    max_block_dimX = prop.maxThreadsDim[0];
+    max_block_dimY = prop.maxThreadsDim[1];
+    max_block_dimZ = prop.maxThreadsDim[2];
+    max_grid_dimX = prop.maxGridSize[0];
+    max_grid_dimY = prop.maxGridSize[1];
+    max_grid_dimZ = prop.maxGridSize[2];
+
+    printf("--------------- Device Properties ---------------\n");
+    printf("Device name           : %s\n", prop.name);
+    printf("Max threads per block : %d\n", max_threads);
+    printf("Max block dimensions  : %d x %d x %d\n", max_block_dimX, max_block_dimY, max_block_dimZ);
+    printf("Max grid dimensions   : %d x %d x %d\n", max_grid_dimX, max_grid_dimY, max_grid_dimZ);
+    printf("-------------------------------------------------\n");
+
+    if (n < 1)
+    { printf("Error --> Matrix size must be at least 1\n"); exit(1); }
+    if (threadsPerBlock < 1)
+    { printf("Error --> Threads per block (block size) must be at least 1\n"); exit(1); }
+    if (blocksPerGrid < 1)
+    { printf("Error --> Blocks per grid (grid size) must be at least 1\n"); exit(1); }
+    if (threadsPerBlock > max_threads)
+    { printf("Error --> Threads per block (block size) exceed maximum allowed for %s\n", prop.name); exit(1); }
+    if (blocksPerGrid > max_grid_dimX)
+    { printf("Error --> Blocks per grid (grid size) exceed maximum allowed for %s\n", prop.name); exit(1); }
+
     fpA = fopen(argv[1], "w");
-    if (fpA == NULL) 
-    {
-        printf("Cannot open file %s\n", argv[1]);
-        exit(1);
-    }
+    if (fpA == NULL) { printf("Cannot open file %s\n", argv[1]); exit(1); }
+    fpAcov = fopen(argv[2], "w");
+    if (fpAcov == NULL) { printf("Cannot open file %s\n", argv[2]); exit(1); }
 
-    fpA_cov = fopen(argv[2], "w");
-    if (fpA_cov == NULL) 
-    {
-        printf("Cannot open file %s\n", argv[2]);
-        exit(1);
-    }
+    err = cudaEventCreate(&start);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
+    err = cudaEventCreate(&stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
+  
+    printf("--------------- Input Parameters ---------------\n");
+    printf("Matrix size        : %d x %d\n", n, n);
+    printf("Blocks per Grid    : %d\n", blocksPerGrid);
+    printf("Threads per Block  : %d\n", threadsPerBlock);
+    printf("------------------------------------------------\n");
 
-    printf("Matrix size  : %d x %d\n", matrix_size, matrix_size );
-    printf("Grid size    : %d\n", grid_size);
-    printf("Block size   : %d\n", block_size);
-    printf("-----------------------------------\n");
+    intBytes = n * n * sizeof(int);
 
-    A = (int **) malloc(matrix_size * sizeof(int *));
-    A_cov = (int **) malloc(matrix_size * sizeof(int *));
-    for (i = 0; i < matrix_size; i++) 
-    {
-        A[i] = (int *) malloc(matrix_size * sizeof(int));
-        if (A[i] == NULL) 
+    h_A = (int *) malloc(intBytes);
+    if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
+
+    for (i = 0; i < n; i++)
+        for (j = 0; j < n; j++)
         {
-            printf("Memory allocation failed for A[%d]\n", i);
-            exit(1);
+            h_A[i * n + j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
+            h_A[i * n + j] = h_A[i * n + j] >= 0 ? h_A[i * n + j] + 10 : h_A[i * n + j] - 10;  // Τυχαία επιλογή προσήμου
         }
-        A_cov[i] = (int *) malloc(matrix_size * sizeof(int));
-        if (A_cov[i] == NULL) 
-        {
-            printf("Memory allocation failed for A_cov[%d]\n", i);
-            exit(1);
-        }
-    }
+    
+    err = cudaMalloc((void **) &d_A, intBytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
 
-    srand(time(NULL));
+    err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
 
-    for (i = 0; i < size; i++)
-    {
-        for (j = 0; j < size; j++)
-        {
-            A[i][j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
-            A[i][j] = A[i][j] >= 0 ? A[i][j] + 10 : A[i][j] - 10;  // Τυχαία επιλογή προσήμου
-        }
-    }
+    dim3 dimBlock(nThreads, nThreads);
+    dim3 dimGrid(nBlocks, nBlocks);
+
+    cudaEventRecord(start, 0);
+
+    // Κλήση του kernel
+
+    cudaEventRecord(stop, 0);
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsedTime, start, stop);
+    printf("Time for the kernel: %f ms\n", elapsedTime);
+
+    free(h_A);
+    cudaFree(d_A);
 
     fclose(fpA);
-    fclose(fpA_cov);
-
+    fclose(fpAcov);
 
     return 0;
 }
