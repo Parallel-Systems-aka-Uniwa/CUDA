@@ -121,10 +121,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     double m;
     int amax;
 
-    if (tid < totalElements)
-        sharedMin[cacheIndex] = d_A[tid];
-    else
-        sharedMin[cacheIndex] = INT_MAX;
+    sharedMin[cacheIndex] = d_A[tid];
 
     __syncthreads();
 
@@ -143,13 +140,12 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, do
     
     __syncthreads();
 
-    if (tid < totalElements)
-    {
+
         m = *d_avg;
         amax = *d_max;
 
         d_outArr[tid] = (m - (float) d_A[tid]) / (float) amax;
-    }
+
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -339,11 +335,12 @@ int main(int argc, char *argv[])
     {
         arr = 'B';
 
+/*
         err = cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice) failed."); exit(1); }
         err = cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
-
+*/
         createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_min, d_max, d_avg);
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
