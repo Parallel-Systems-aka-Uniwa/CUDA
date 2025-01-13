@@ -111,11 +111,12 @@ __device__ void atomicMin(float *address, float val)
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
-    __shared__ double cache[nThreads];
+    __shared__ double cache[nThreads];  // Shared memory for reduction
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
+    // Calculate the corresponding value for B_ij
     if (row < N && col < N)
     {
         if (*d_amax != 0)
@@ -123,30 +124,33 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
         else
             d_outArr[row * N + col] = 0.0; // Handle division by zero
     }
-    
+
     int tid = row * N + col; // Global index for 2D array
 
-    if (row < N && col < N)  // Ensure within bounds
+    // Load data into shared memory (cache)
+    if (row < N && col < N)  
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000.0;  // Avoid out-of-bound reads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = FLT_MAX;  // Use a large number as placeholder for out-of-bounds threads
 
     __syncthreads();  // Synchronize threads in the block
 
     // Perform parallel reduction within the block
-    int i = blockDim.x * blockDim.y / 2; 
+    int i = blockDim.x * blockDim.y / 2;  // Half of the total threads
     while (i != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+        if (threadIdx.x + threadIdx.y * blockDim.x < i) 
+        {
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 min(cache[threadIdx.x + threadIdx.y * blockDim.x], cache[threadIdx.x + threadIdx.y * blockDim.x + i]);
-        __syncthreads();  // Synchronize threads in the block
-        i /= 2;
+        }
+        __syncthreads();  // Synchronize threads
+        i /= 2;  // Half the stride each iteration
     }
 
-    // Atomic max to the global max if this thread is the first in the block
+    // Atomic update for global minimum value using the custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, (float) cache[0]);
+        atomicMin(d_bmin, (float) cache[0]);  // Use custom atomicMin with float values
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
