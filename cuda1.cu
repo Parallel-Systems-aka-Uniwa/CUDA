@@ -120,6 +120,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
 
+    int idx;
+    int partnerIdx;
+
     // Calculate the corresponding value for B_ij
     if (row < N && col < N)
     {
@@ -145,9 +148,13 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < i) 
         {
-            cache[threadIdx.x + threadIdx.y * blockDim.x] = 
+            idx = threadIdx.x + threadIdx.y * blockDim.x;
+            partnerIdx = idx + i;
+            if (partnerIdx < blockDim.x * blockDim.y)
+                cache[idx] = min(cache[idx], cache[partnerIdx]);
+            /*cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
-                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];*/
         }
         __syncthreads();  // Synchronize threads
         i /= 2;  // Half the stride each iteration
