@@ -125,9 +125,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     {
         idx = row * N + col;
         if (*d_amax != 0)
-            d_OutArr[cacheIndex] = (*d_avg - (double) d_A[cacheIndex]) / (double) *d_amax;
+            d_outArr[cacheIndex] = (*d_avg - (double) d_A[cacheIndex]) / (double) *d_amax;
         else
-            d_OutArr[cacheIndex] = 0.0; // Handle division by zero
+            d_outArr[cacheIndex] = 0.0; // Handle division by zero
     }
 
     // Initialize shared memory
