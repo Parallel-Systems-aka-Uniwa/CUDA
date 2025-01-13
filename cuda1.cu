@@ -161,6 +161,20 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
 __global__ void createC(int *d_A, float *d_outArr)
 {
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+    int left, right, current;
+
+    // Check if within bounds
+    if (row < N && col < N)
+    {
+        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Left neighbor (handle boundary)
+        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Right neighbor (handle boundary)
+        current = d_A[i * N + j];  // Current element
+        
+        // Compute Cij
+        d_outArr[i * N + j] = (current + left + right) / 3;
+    }
 
 }
 
@@ -341,7 +355,7 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    if (1)//(*h_amax > N * (*h_avg))
+    if (0)//(*h_amax > N * (*h_avg))
     {
         arr = 'B';
 
