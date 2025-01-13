@@ -139,7 +139,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
         __syncthreads();  // Synchronize threads in the block
         i /= 2;
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
         err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
-        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
         printf("Min: %f\n", *h_bmin);
     }
