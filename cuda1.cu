@@ -111,11 +111,7 @@ __device__ void atomicMin(float *address, float val)
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
-    __shared__ double sharedMin[nThreads];
-
-    int tid = threadIdx.x + threadIdx.y * blockDim.x;
-    int cacheIndex = blockIdx.x * blockDim.x * blockDim.y + tid;
-    int totalElements = N * N;
+    __shared__ double cache[nThreads];
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -127,29 +123,31 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
         else
             d_outArr[row * N + col] = 0.0; // Handle division by zero
     }
+    
+    int tid = row * N + col; // Global index for 2D array
 
-    // Initialize shared memory
-    if (cacheIndex < totalElements)
-        sharedMin[tid] = d_A[cacheIndex];
+    if (row < N && col < N)  // Ensure within bounds
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_OutArr[tid];
     else
-        sharedMin[tid] = 100000000000000.0;
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
 
-    __syncthreads();
+    __syncthreads();  // Synchronize threads in the block
 
-    // Block-wise reduction to find minimum
-    int i = blockDim.x * blockDim.y / 2;
-
-    while (i != 0)
+    // Perform parallel reduction within the block
+    int i = blockDim.x * blockDim.y / 2; 
+    while (i != 0) 
     {
-        if (tid < i && tid + i < totalElements)
-            sharedMin[tid] = min(sharedMin[tid], sharedMin[tid + i]);
-        __syncthreads();
+        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+            cache[threadIdx.x + threadIdx.y * blockDim.x] = 
+                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+        __syncthreads();  // Synchronize threads in the block
         i /= 2;
     }
 
-    // Thread 0 writes the block result to global memory
-    if (tid == 0)
-        atomicMin(d_bmin, (float)sharedMin[0]);
+    // Atomic max to the global max if this thread is the first in the block
+    if (threadIdx.x == 0 && threadIdx.y == 0) 
+        atomicMin(d_bmin, (float) cache[0]);
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
