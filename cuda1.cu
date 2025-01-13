@@ -127,7 +127,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     int tid = row * N + col; // Global index for 2D array
 
     if (row < N && col < N)  // Ensure within bounds
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_OutArr[tid];
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
         cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
 
