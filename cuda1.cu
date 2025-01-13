@@ -19,7 +19,7 @@
 #define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void calcAvg(int *d_A, int *d_sum, double *d_avg) 
+__global__ void calcAvg(int *d_A, int *d_sum, float *d_avg) 
 {
     __shared__ int cache[nThreads];  // Shared memory for each block
 
@@ -54,7 +54,7 @@ __global__ void calcAvg(int *d_A, int *d_sum, double *d_avg)
 
     // Calculate average after reduction
     if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0)
-        *d_avg = (double)(*d_sum) / totalElements;
+        *d_avg = (float)(*d_sum) / totalElements;
 }
 
 
@@ -113,7 +113,7 @@ __device__ void atomicMin(float *address, float val)
 
 
 // Βij = (m–Aij)/amax
-__global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
+__global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, float *d_avg)
 {
     __shared__ float cache[nThreads];  // Shared memory for reduction
 
@@ -127,7 +127,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     if (row < N && col < N)
     {
         if (*d_amax != 0)
-            d_outArr[row * N + col] = (*d_avg - (double) d_A[row * N + col]) / (double) *d_amax;
+            d_outArr[row * N + col] = (*d_avg - (float) d_A[row * N + col]) / (float) *d_amax;
         else
             d_outArr[row * N + col] = 0.0; // Handle division by zero
     }
@@ -148,13 +148,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < i) 
         {
-            idx = threadIdx.x + threadIdx.y * blockDim.x;
-            partnerIdx = idx + i;
-            if (partnerIdx < blockDim.x * blockDim.y)
-                cache[idx] = min(cache[idx], cache[partnerIdx]);
-            /*cache[threadIdx.x + threadIdx.y * blockDim.x] = 
+            cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
-                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];*/
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
         }
         __syncthreads();  // Synchronize threads
         i /= 2;  // Half the stride each iteration
@@ -177,9 +173,9 @@ int main(int argc, char *argv[])
     int *h_A;
     int *h_amax, *h_sum;
     int *d_A, *d_amax, *d_sum;
-    double *h_OutArr;
-    double *h_avg;
-    double *d_OutArr, *d_avg;
+    float *h_OutArr;
+    float *h_avg;
+    float *d_OutArr, *d_avg;
     float *h_bmin, *d_bmin;
 
     int n, threadsPerBlock, blocksPerGrid;
@@ -253,13 +249,13 @@ int main(int argc, char *argv[])
     printf("------------------------------------------------\n");
 
     intBytes = n * n * sizeof(int);
-    doubleBytes = n * n * sizeof(double);
+    floatBytes = n * n * sizeof(float);
 
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
-    h_OutArr = (double *) malloc(doubleBytes);
+    h_OutArr = (float *) malloc(floatBytes);
     if (h_OutArr == NULL) { printf("Error --> Memory allocation failed for OutArr.\n"); exit(1); }
-    h_avg = (double *) malloc(sizeof(double));
+    h_avg = (float *) malloc(sizeof(float));
     if (h_avg == NULL) { printf("Error --> Memory allocation failed for avg.\n"); exit(1); }
     h_amax = (int *) malloc(sizeof(int));
     if (h_amax == NULL) { printf("Error --> Memory allocation failed for max.\n"); exit(1); }
@@ -288,11 +284,11 @@ int main(int argc, char *argv[])
 
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_OutArr, doubleBytes);
+    err = cudaMalloc((void **) &d_OutArr, floatBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_OutArray, bytes) failed."); exit(1); }
     err = cudaMalloc((void **) &d_sum, sizeof(int));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_sum, sizeof(int)) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_avg, sizeof(double));
+    err = cudaMalloc((void **) &d_avg, sizeof(float));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_avg, sizeof(float)) failed."); exit(1); }
     err = cudaMalloc((void **) &d_amax, sizeof(int));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_amax, sizeof(int)) failed."); exit(1); }
@@ -316,10 +312,10 @@ int main(int argc, char *argv[])
 
     calcAvg<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
 
-    err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("Average: %lf\n", *h_avg);
+    printf("Average: %f\n", *h_avg);
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
@@ -399,7 +395,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            fprintf(fpOutArr, "%8lf ", h_OutArr[i * n + j]);
+            fprintf(fpOutArr, "%8f ", h_OutArr[i * n + j]);
         }
 
         fprintf(fpA, "\n");
