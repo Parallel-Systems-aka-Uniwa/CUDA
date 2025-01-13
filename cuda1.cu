@@ -131,7 +131,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     if (row < N && col < N)  
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = FLT_MAX;  // Use a large number as placeholder for out-of-bounds threads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
 
     __syncthreads();  // Synchronize threads in the block
 
