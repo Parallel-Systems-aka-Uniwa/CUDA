@@ -11,7 +11,6 @@
  */
 #include <stdio.h>
 #include <time.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
@@ -126,16 +125,16 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     {
         idx = row * N + col;
         if (*d_amax != 0)
-            d_OutArr[idx] = (*d_avg - (double) d_A[idx]) / (double) *d_amax;
+            d_OutArr[cacheIndex] = (*d_avg - (double) d_A[cacheIndex]) / (double) *d_amax;
         else
-            d_OutArr[idx] = 0.0; // Handle division by zero
+            d_OutArr[cacheIndex] = 0.0; // Handle division by zero
     }
 
     // Initialize shared memory
     if (cacheIndex < totalElements)
         sharedMin[tid] = d_A[cacheIndex];
     else
-        sharedMin[tid] = DBL_MAX;
+        sharedMin[tid] = 100000000000000.0;
 
     __syncthreads();
 
