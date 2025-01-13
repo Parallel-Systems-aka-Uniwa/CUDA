@@ -116,6 +116,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int totalElements = N * N;
 
+    int row = tid / N;
+    int col = tid % N;
+
     int cacheIndex = threadIdx.x;
 
     sharedMin[cacheIndex] = d_A[tid];
@@ -138,7 +141,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     __syncthreads();
 
     if (tid < totalElements)
-        d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
+        d_outArr[row * N + col] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
