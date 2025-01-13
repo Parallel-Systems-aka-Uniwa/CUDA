@@ -11,6 +11,7 @@
  */
 #include <stdio.h>
 #include <time.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <math.h>
 #include <cuda.h>
@@ -19,7 +20,7 @@
 #define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void add(int *d_A, int *d_sum, double *d_avg) 
+__global__ void calcAvg(int *d_A, int *d_sum, double *d_avg) 
 {
     __shared__ int cache[nThreads];  // Shared memory for each block
 
@@ -111,45 +112,47 @@ __device__ void atomicMin(float *address, float val)
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
-    __shared__ int sharedMin[nThreads];
+    __shared__ double sharedMin[nThreads];
 
-    int tid = threadIdx.x + blockIdx.x * blockDim.x; // Global thread index
-    int totalElements = N * N;                      // Total number of elements in the matrix
+    int tid = threadIdx.x + threadIdx.y * blockDim.x;
+    int cacheIndex = blockIdx.x * blockDim.x * blockDim.y + tid;
+    int totalElements = N * N;
 
-    int cacheIndex = threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int idx;
+
+    if (row < N && col < N)
+    {
+        idx = row * N + col;
+        if (*d_amax != 0)
+            d_OutArr[idx] = (*d_avg - (double) d_A[idx]) / (double) *d_amax;
+        else
+            d_OutArr[idx] = 0.0; // Handle division by zero
+    }
 
     // Initialize shared memory
-    if (tid < totalElements)
-        sharedMin[cacheIndex] = d_A[tid];
+    if (cacheIndex < totalElements)
+        sharedMin[tid] = d_A[cacheIndex];
     else
-        sharedMin[cacheIndex] = INT_MAX;
+        sharedMin[tid] = DBL_MAX;
 
     __syncthreads();
 
     // Block-wise reduction to find minimum
-    int i = blockDim.x / 2;
+    int i = blockDim.x * blockDim.y / 2;
+
     while (i != 0)
     {
-        if (cacheIndex < i)
-            sharedMin[cacheIndex] = min(sharedMin[cacheIndex], sharedMin[cacheIndex + i]);
+        if (tid < i && tid + i < totalElements)
+            sharedMin[tid] = min(sharedMin[tid], sharedMin[tid + i]);
         __syncthreads();
         i /= 2;
     }
 
     // Thread 0 writes the block result to global memory
-    if (cacheIndex == 0)
+    if (tid == 0)
         atomicMin(d_bmin, (float)sharedMin[0]);
-
-    __syncthreads();
-
-    // Compute B_{ij}
-    if (tid < totalElements)
-    {
-        if (*d_amax != 0)
-            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
-        else 
-            d_outArr[tid] = 0.0; // Handle division by zero
-    }
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -301,7 +304,7 @@ int main(int argc, char *argv[])
     dim3 dimBlock(nThreads, nThreads);
     dim3 dimGrid(nBlocks, nBlocks);
 
-    add<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
+    calcAvg<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
@@ -345,7 +348,7 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
 */
-        createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
+        createB<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
@@ -385,9 +388,6 @@ int main(int argc, char *argv[])
     {
         for (j = 0; j < n; j++)
         {
-printf("A[%d][%d] = %d, OutArr[%d][%d] = %lf\n",
-               i, j, h_A[i * n + j], i, j, h_OutArr[i * n + j]);
-
             fprintf(fpA, "%4d ", h_A[i * n + j]);
             fprintf(fpOutArr, "%4lf ", h_OutArr[i * n + j]);
         }
