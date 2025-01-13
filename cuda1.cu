@@ -109,24 +109,25 @@ __device__ void atomicMin(float *address, float val)
 
 
 // Βij = (m–Aij)/amax
-__global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
+__global__ void createB(int *d_A, double *d_outArr, float *d_min, int *d_max, double *d_avg)
 {
     __shared__ int sharedMin[nThreads];
 
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int totalElements = N * N;
-
-    int row = tid / N;
-    int col = tid % N;
+    int tid = threadIdx.x + blockIdx.x * blockDim.x; // Global thread index
+    int totalElements = N * N;                      // Total number of elements in the matrix
 
     int cacheIndex = threadIdx.x;
 
-    sharedMin[cacheIndex] = d_A[tid];
+    // Initialize shared memory
+    if (tid < totalElements)
+        sharedMin[cacheIndex] = d_A[tid];
+    else
+        sharedMin[cacheIndex] = INT_MAX;
 
     __syncthreads();
 
+    // Block-wise reduction to find minimum
     int i = blockDim.x / 2;
-
     while (i != 0)
     {
         if (cacheIndex < i)
@@ -135,13 +136,20 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
         i /= 2;
     }
 
+    // Thread 0 writes the block result to global memory
     if (cacheIndex == 0)
-        atomicMin(d_bmin, (float) sharedMin[0]);
-    
+        atomicMinFloat(d_min, (float)sharedMin[0]);
+
     __syncthreads();
 
+    // Compute B_{ij}
     if (tid < totalElements)
-        d_outArr[row * N + col] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
+    {
+        if (amax != 0)
+            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) amax;
+        else 
+            d_outArr[tid] = 0.0; // Handle division by zero
+    }
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
