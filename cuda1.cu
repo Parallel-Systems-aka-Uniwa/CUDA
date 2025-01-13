@@ -166,7 +166,7 @@ __global__ void createC(int *d_A, float *d_outArr)
     int left, right, current;
 
     // Check if within bounds
-    if (row < N && col < N)
+    if (i < N && j < N)
     {
         left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Left neighbor (handle boundary)
         right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Right neighbor (handle boundary)
