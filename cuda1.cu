@@ -339,6 +339,11 @@ int main(int argc, char *argv[])
     {
         arr = 'B';
 
+        err = cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice) failed."); exit(1); }
+        err = cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_max, h_max, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
+
         createB<<<nBlocks, nThreads>>>(d_A, d_OutArr, d_min, d_max, d_avg);
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
