@@ -111,7 +111,7 @@ __device__ void atomicMin(float *address, float val)
 // Βij = (m–Aij)/amax
 __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, double *d_avg)
 {
-    __shared__ double cache[nThreads];  // Shared memory for reduction
+    __shared__ int cache[nThreads];  // Shared memory for reduction
 
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -129,9 +129,9 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
 
     // Load data into shared memory (cache)
     if (row < N && col < N)  
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;//10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
 
     __syncthreads();  // Synchronize threads in the block
 
@@ -151,7 +151,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
 
     // Atomic update for global minimum value using the custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, (float) cache[0]);  // Use custom atomicMin with float values
+        atomicMin(d_amax, cache[0]);  // Use custom atomicMin with float values
 }
 
 // Cij = (Aij+Ai(j+1)+Ai(j-1))/3
@@ -351,7 +351,7 @@ int main(int argc, char *argv[])
 
         err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
-        err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_amax, d_amax, sizeof(double), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
         printf("Min: %f\n", *h_bmin);
