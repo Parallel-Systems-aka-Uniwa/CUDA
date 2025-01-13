@@ -138,7 +138,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
 
     // Thread 0 writes the block result to global memory
     if (cacheIndex == 0)
-        atomicMin(d_min, (float)sharedMin[0]);
+        atomicMin(d_bmin, (float)sharedMin[0]);
 
     __syncthreads();
 
@@ -146,7 +146,7 @@ __global__ void createB(int *d_A, double *d_outArr, float *d_bmin, int *d_amax, 
     if (tid < totalElements)
     {
         if (*d_amax != 0)
-            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_max;
+            d_outArr[tid] = (*d_avg - (double) d_A[tid]) / (double) *d_amax;
         else 
             d_outArr[tid] = 0.0; // Handle division by zero
     }
