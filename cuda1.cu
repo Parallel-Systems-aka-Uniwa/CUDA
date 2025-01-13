@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
 
         createC<<<nBlocks, nThreads>>>(d_A, d_OutArr);
 
-        err = cudaMemcpy(h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost);
+        err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
     }
 
