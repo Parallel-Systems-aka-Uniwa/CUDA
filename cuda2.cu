@@ -19,7 +19,7 @@
 #define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void calcColumnMeans(int *d_A, float *d_Amean) 
+__global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
     __shared__ float cache[nThreads];  // Shared memory for block reduction
 
@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
 
     // Κλήση του kernel
-    calcMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
+    calcColMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
