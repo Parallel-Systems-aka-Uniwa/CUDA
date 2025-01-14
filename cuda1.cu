@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("The array %c has been stored in file %s\n", arr,  argv[1]);
+        printf("The array %c has been stored in file %s\n", arr,  argv[2]);
         printf("Min: %4.2f\n", *h_bmin);
     }
     else
@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("The array %c has been stored in file %s\n", arr,  argv[1]);
+        printf("The array %c has been stored in file %s\n", arr,  argv[2]);
     }
 
     cudaEventRecord(stop,0);
