@@ -178,6 +178,9 @@ __global__ void createC(int *d_A, float *d_outArr)
 
 }
 
+void create2DArray1(int *Array);
+void create2DArray2(int *Array);
+
 int main(int argc, char *argv[])
 {
 
