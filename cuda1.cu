@@ -282,13 +282,10 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    for (i = 0; i < n; i++)
-        for (j = 0; j < n; j++)
-        {
-            h_A[i * n + j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
-            h_A[i * n + j] = h_A[i * n + j] >= 0 ? h_A[i * n + j] + 10 : h_A[i * n + j] - 10;  // Τυχαία επιλογή προσήμου
-            h_OutArr[i * n + j] = 0.0;
-        }
+    if (rand() % 2 == 0)
+        create2DArray1(h_A);
+    else
+        create2DArray2(h_A);
 
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
     err = cudaEventRecord(startAll, 0);
@@ -355,7 +352,7 @@ int main(int argc, char *argv[])
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
-    if (1)//(*h_amax > N * (*h_avg))
+    if (*h_amax > N * (*h_avg))
     {
         arr = 'B';
 
@@ -434,4 +431,67 @@ int main(int argc, char *argv[])
     cudaFree(d_sum);
 
     return 0;
+}
+
+void create2DArray1(int *Array)
+{
+    int sum = 0;
+    int amax = 0;
+    int i, j, m;
+
+    for (i = 0; i < N; ++i) 
+    {
+        for (j = 0; j < N; ++j) 
+        {
+            Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
+            sum += Array[i * N + j];
+            if (Array[i * N + j] > amax) 
+            {
+                amax = Array[i * N + j];
+            }
+        }
+    }
+
+    m = sum / (N * N); // Calculate average
+    while (amax <= N * m) 
+    {
+        // Adjust amax to satisfy the condition
+        i = rand() % N;
+        j = rand() % N;
+        Array[i * N + j] += (N * m - amax + 1);
+        amax = Array[i * N + j];
+    }
+}
+
+void create2DArray2(int *Array) 
+{
+    int sum = 0;
+    int amax = 0;
+    int i, j, m;
+
+    for (i = 0; i < N; ++i) 
+    {
+        for (j = 0; j < N; ++j) 
+        {
+            Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
+            sum += Array[i * N + j];
+            if (Array[i * N + j] > amax) 
+            {
+                amax = Array[i * N + j];
+            }
+        }
+    }
+
+    m = sum / (N * N); // Calculate average
+    while (amax > N * m) 
+    {
+        // Adjust amax to satisfy the condition
+        i = rand() % N;
+        j = rand() % N;
+        if (Array[i * N + j] > 1) 
+        {
+            Array[i * N + j] -= (amax - N * m);
+            amax = Array[i * N + j];
+        }
+    }
 }
