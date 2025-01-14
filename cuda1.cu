@@ -441,7 +441,7 @@ void create2DArray1(int *Array)
     int sum = 0;
     int amax = 0;
     int i, j, m;
-
+    printf("Array A\n");
     for (i = 0; i < N; ++i) 
     {
         for (j = 0; j < N; ++j) 
@@ -471,7 +471,7 @@ void create2DArray2(int *Array)
     int sum = 0;
     int amax = 0;
     int i, j, m;
-
+    printf("Array 2\n");
     for (i = 0; i < N; ++i) 
     {
         for (j = 0; j < N; ++j) 
