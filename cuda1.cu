@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
         printf("The array %c has been stored in file %s\n", arr,  argv[2]);
-        printf("Min: %4.2f\n", *h_bmin);
+        printf("Min: %4.4f\n", *h_bmin);
     }
     else
     {
