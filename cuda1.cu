@@ -24,13 +24,13 @@ __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg)
     __shared__ int cache[nThreads];  // Shared memory for each block
 
     // Calculate global row and column index
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
     
     int totalElements = N * N;
-    int tid = row * N + col; // Global index for 2D array
+    int tid = i * N + j; // Global index for 2D array
 
-    if (row < N && col < N)  // Ensure within bounds
+    if (i < N && j < N)  // Ensure within bounds
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
         cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
@@ -38,14 +38,14 @@ __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg)
     __syncthreads();  // Synchronize threads in the block
 
     // Perform parallel reduction within the block
-    int i = blockDim.x * blockDim.y / 2; 
-    while (i != 0) 
+    int k = blockDim.x * blockDim.y / 2; 
+    while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid indices reduce
             cache[threadIdx.x + threadIdx.y * blockDim.x] += 
-                cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+                cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         __syncthreads();  // Synchronize threads in the block
-        i /= 2;
+        k /= 2;
     }
 
     // Atomic addition to the global sum if this thread is the first in the block
@@ -63,12 +63,12 @@ __global__ void findMax(int *d_A, int *d_amax)
     __shared__ int cache[nThreads];  // Shared memory for each block
 
     // Calculate global row and column index
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int tid = row * N + col; // Global index for 2D array
+    int tid = i * N + j; // Global index for 2D array
 
-    if (row < N && col < N)  // Ensure within bounds
+    if (i < N && j < N)  // Ensure within bounds
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
         cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
@@ -76,15 +76,15 @@ __global__ void findMax(int *d_A, int *d_amax)
     __syncthreads();  // Synchronize threads in the block
 
     // Perform parallel reduction within the block
-    int i = blockDim.x * blockDim.y / 2; 
-    while (i != 0) 
+    int k = blockDim.x * blockDim.y / 2; 
+    while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < i)  // Only threads with valid indices reduce
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid indices reduce
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
-                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+                cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         __syncthreads();  // Synchronize threads in the block
-        i /= 2;
+        k /= 2;
     }
 
     // Atomic max to the global max if this thread is the first in the block
@@ -117,22 +117,22 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
 {
     __shared__ float cache[nThreads];  // Shared memory for reduction
 
-    int row = blockIdx.y * blockDim.y + threadIdx.y;
-    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = blockIdx.y * blockDim.y + threadIdx.y;
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
 
     // Calculate the corresponding value for B_ij
-    if (row < N && col < N)
+    if (i < N && j < N)
     {
         if (*d_amax != 0)
-            d_outArr[row * N + col] = (*d_avg - (float) d_A[row * N + col]) / (float) *d_amax;
+            d_outArr[i * N + j] = (*d_avg - (float) d_A[i * N + j]) / (float) *d_amax;
         else
-            d_outArr[row * N + col] = 0.0; // Handle division by zero
+            d_outArr[i * N + j] = 0.0; // Handle division by zero
     }
 
-    int tid = row * N + col; // Global index for 2D array
+    int tid = i * N + j; // Global index for 2D array
 
     // Load data into shared memory (cache)
-    if (row < N && col < N)  
+    if (i < N && j < N)  
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
         cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
@@ -140,17 +140,17 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
     __syncthreads();  // Synchronize threads in the block
 
     // Perform parallel reduction within the block
-    int i = blockDim.x * blockDim.y / 2;  // Half of the total threads
-    while (i != 0) 
+    int k = blockDim.x * blockDim.y / 2;  // Half of the total threads
+    while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < i) 
+        if (threadIdx.x + threadIdx.y * blockDim.x < k) 
         {
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
-                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + i] ?
-                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + i];
+                cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
+                cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         }
         __syncthreads();  // Synchronize threads
-        i /= 2;  // Half the stride each iteration
+        k /= 2;  // Half the stride each iteration
     }
 
     // Atomic update for global minimum value using the custom atomicMin
