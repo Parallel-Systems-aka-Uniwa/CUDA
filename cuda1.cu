@@ -459,12 +459,18 @@ void create2DArray1(int *Array)
 
     // Ensure the condition `amax > N * m`
     if (amax <= N * m) {
-        // Select a random element and increase its value
-        i = rand() % N;
-        j = rand() % N;
-        int adjustment = (N * m - amax + 1); // Calculate the adjustment needed
-        Array[i * N + j] += adjustment;
-        amax = Array[i * N + j];
+        // Find the current maximum value's location and adjust it
+        for (i = 0; i < N; ++i) {
+            for (j = 0; j < N; ++j) {
+                if (Array[i * N + j] == amax) {
+                    // Add the necessary value to make amax > N * m
+                    Array[i * N + j] += (N * m - amax + 1);
+                    amax = Array[i * N + j];
+                    break; // Exit the loop after adjustment
+                }
+            }
+            if (amax > N * m) break; // Exit the outer loop if condition satisfied
+        }
     }
 }
 
