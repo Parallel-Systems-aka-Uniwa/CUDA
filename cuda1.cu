@@ -182,24 +182,24 @@ void create2DArray(int *Array);
 
 int main(int argc, char *argv[])
 {
-
-    int *h_A;
-    int *h_amax, *h_sum;
-    int *d_A, *d_amax, *d_sum;
-    float *h_OutArr;
-    float *h_avg;
-    float *d_OutArr, *d_avg;
-    float *h_bmin, *d_bmin;
-    int n, threadsPerBlock, blocksPerGrid;
-    int intBytes, floatBytes;
-    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
-    int i, j;
-    FILE *fpA, *fpOutArr;
-    char arr;
-    float elapsedTime1, elapsedTime2, elapsedTime3, elapsedTimeAll;
-    cudaEvent_t start, stop;
-    cudaError_t err;
-    cudaDeviceProp prop;
+    int *h_A;                                                        // [Host] Ο πίνακας Α 
+    int *h_amax, *h_sum;                                             // [Host] Το μέγιστο στοιχείο του Α και το άθροισμα των στοιχείων
+    int *d_A, *d_amax, *d_sum;                                       // [Device] Ο πίνακας Α, το μέγιστο στοιχείο και το άθροισμα των στοιχείων
+    float *h_OutArr;                                                 // [Host] Ο πίνακας B ή C
+    float *h_avg;                                                    // [Host] Ο μέσος όρος των στοιχείων του Α
+    float *d_OutArr, *d_avg;                                         // [Device] Ο πίνακας B ή C και ο μέσος όρος
+    float *h_bmin, *d_bmin;                                          // [Host] Το ελάχιστο στοιχείο του B και [Device] το ελάχιστο στοιχείο
+    int n, threadsPerBlock, blocksPerGrid;                           // Το μέγεθος του πίνακα, τα νήματα ανά μπλοκ και τα μπλοκ ανά πλέγμα
+    int intBytes, floatBytes;                                        // Το μέγεθος των πινάκων σε bytes
+    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ; // Οι μέγιστες τιμές για τα νήματα και τις διαστάσεις των μπλοκ
+    int max_grid_dimX, max_grid_dimY, max_grid_dimZ;                 // Οι μέγιστες τιμές για τις διαστάσεις των πλέγματων
+    int i, j;                                                        // Δείκτες επανάληψης
+    FILE *fpA, *fpOutArr;                                            // Δείκτες αρχείων για την αποθήκευση των πινάκων Α και Β ή C
+    char arr;                                                        // Το όνομα του πίνακα Β ή C
+    float elapsedTime1, elapsedTime2, elapsedTime3;                  // Ο χρόνος εκτέλεσης των kernels
+    cudaEvent_t start, stop;                                         // Τα σημεία αναφοράς του χρόνου εκτέλεσης
+    cudaError_t err;                                                 // Κωδικός σφάλματος CUDA
+    cudaDeviceProp prop;                                             // Τα χαρακτηριστικά της συσκευής
 
     if (argc != 3)
     {
