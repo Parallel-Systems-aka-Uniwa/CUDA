@@ -47,7 +47,7 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 
     // The first thread in the block writes the final result
     if (threadIdx.x == 0) 
-        d_column_means[col] = cache[0] / N;
+        d_Amean[col] = cache[0] / N;
 }
 
 
@@ -201,7 +201,7 @@ int main(int argc, char *argv[])
     cudaFree(d_Amean);
 
     fclose(fpA);
-    fclsoe(fpAmean);
+    fclose(fpAmean);
     fclose(fpAcov);
 
     return 0;
