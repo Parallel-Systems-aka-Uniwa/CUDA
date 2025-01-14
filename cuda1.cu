@@ -190,7 +190,6 @@ int main(int argc, char *argv[])
     float *h_avg;
     float *d_OutArr, *d_avg;
     float *h_bmin, *d_bmin;
-
     int n, threadsPerBlock, blocksPerGrid;
     int intBytes, floatBytes;
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
@@ -198,8 +197,7 @@ int main(int argc, char *argv[])
     FILE *fpA, *fpOutArr;
     char arr;
     float elapsedTime1, elapsedTime2, elapsedTime3, elapsedTimeAll;
-    
-    cudaEvent_t start, stop, startAll, stopAll;
+    cudaEvent_t start, stop;
     cudaError_t err;
     cudaDeviceProp prop;
 
@@ -250,10 +248,6 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
     err = cudaEventCreate(&stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
-    err = cudaEventCreate(&startAll);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&startAll) failed.\n"); exit(1); }
-    err = cudaEventCreate(&stopAll);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stopAll) failed.\n"); exit(1); }
 
     printf("--------------- Input Parameters ---------------\n");
     printf("Matrix size        : %d x %d\n", n, n);
@@ -288,8 +282,6 @@ int main(int argc, char *argv[])
     printf("The array A has been stored in file %s\n", argv[1]);
 
 // ============== Έναρξη Παράλληλου Υπολογισμού ==============
-
-    err = cudaEventRecord(startAll, 0);
 
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
@@ -382,16 +374,6 @@ int main(int argc, char *argv[])
     cudaEventElapsedTime(&elapsedTime3, start, stop);
     printf ("Time for the kernel create%c<<<>>>(): %f ms\n", arr, elapsedTime3);
 
-
-    err = cudaEventRecord(stopAll, 0);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stopAll, 0) failed."); exit(1); }
-    err = cudaEventSynchronize(stopAll);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stopAll) failed."); exit(1); }
-    err = cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll) failed."); exit(1); }
-
-    printf("Time for the kernel: %f ms\n", elapsedTimeAll);
-
 // ============== Λήξη Παράλληλου Υπολογισμού ==============
 
     fprintf(fpOutArr, "Array %c\n", arr);
@@ -413,8 +395,6 @@ int main(int argc, char *argv[])
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
-    cudaEventDestroy(startAll);
-    cudaEventDestroy(stopAll);
 
     free(h_A);
     free(h_OutArr);
