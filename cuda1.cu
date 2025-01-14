@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
     threadsPerBlock = nThreads;
     blocksPerGrid = nBlocks;
 
-    cudaGetDeviceProperties(&prop, 0); // 0 is the device ID
+    cudaGetDeviceProperties(&prop, 0); 
 
     max_threads = prop.maxThreadsPerBlock;
     max_block_dimX = prop.maxThreadsDim[0];
@@ -286,7 +286,8 @@ int main(int argc, char *argv[])
 
     create2DArray(h_A);
 
-/******************* ΠΑΡΑΛΛΗΛΑ ***************/
+// ============== Έναρξη Παράλληλου Υπολογισμού ==============
+
     err = cudaEventRecord(startAll, 0);
 
     err = cudaMalloc((void **) &d_A, intBytes);
@@ -302,34 +303,32 @@ int main(int argc, char *argv[])
     err = cudaMalloc((void **) &d_bmin, sizeof(float)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_bmin, sizeof(int)) failed."); exit(1); }
 
-/* 1o kernel launch */
+    dim3 dimBlock(nThreads, nThreads);
+    dim3 dimGrid(nBlocks, nBlocks);
+
+/* 1η κλήση Kernel */
 
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
     err = cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
 
-    elapsedTimeAll = 0.0;
-
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
-
-    dim3 dimBlock(nThreads, nThreads);
-    dim3 dimGrid(nBlocks, nBlocks);
 
     calcAvg<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("Average: %f\n", *h_avg);
+    printf("Average: %4.2f\n", *h_avg);
 
     cudaEventRecord(stop,0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsedTime1, start, stop);
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
 
-/* 2o kernel launch */
+/* 2η κλήση Kernel */
 
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
@@ -346,7 +345,7 @@ int main(int argc, char *argv[])
     cudaEventElapsedTime(&elapsedTime2, start, stop);
     printf ("Time for the kernel findMax<<<>>>(): %f ms\n", elapsedTime2);
 
-/* 3o kernel launch */
+/* 3η κλήση Kernel */
 
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
@@ -355,12 +354,6 @@ int main(int argc, char *argv[])
     {
         arr = 'B';
 
-/*
-        err = cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_avg, h_avg, sizeof(double), cudaMemcpyHostToDevice) failed."); exit(1); }
-        err = cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice);
-        if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_amax, h_amax, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
-*/
         createB<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
 
         err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
@@ -368,7 +361,8 @@ int main(int argc, char *argv[])
         err = cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-        printf("Min: %f\n", *h_bmin);
+        printf("The array %c has been stored in file %s\n", arr,  argv[1]);
+        printf("Min: %4.2f\n", *h_bmin);
     }
     else
     {
@@ -378,6 +372,8 @@ int main(int argc, char *argv[])
 
         err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+        printf("The array %c has been stored in file %s\n", arr,  argv[1]);
     }
 
     cudaEventRecord(stop,0);
@@ -385,7 +381,7 @@ int main(int argc, char *argv[])
     cudaEventElapsedTime(&elapsedTime3, start, stop);
     printf ("Time for the kernel create%c<<<>>>(): %f ms\n", arr, elapsedTime3);
 
-/********************************************/
+
     err = cudaEventRecord(stopAll, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stopAll, 0) failed."); exit(1); }
     err = cudaEventSynchronize(stopAll);
@@ -394,6 +390,8 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTimeAll, startAll, stopAll) failed."); exit(1); }
 
     printf("Time for the kernel: %f ms\n", elapsedTimeAll);
+
+// ============== Λήξη Παράλληλου Υπολογισμού ==============
 
     fprintf(fpOutArr, "Array %c\n", arr);
 
@@ -414,6 +412,8 @@ int main(int argc, char *argv[])
 
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
+    cudaEventDestroy(startAll);
+    cudaEventDestroy(stopAll);
 
     free(h_A);
     free(h_OutArr);
@@ -442,7 +442,7 @@ void create2DArray(int *Array)
     {
         for (j = 0; j < N; ++j) 
         {
-            Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
+            Array[i * N + j] = rand() % 100 + 1;
             sum += Array[i * N + j];
             if (Array[i * N + j] > amax) 
             {
@@ -451,10 +451,9 @@ void create2DArray(int *Array)
         }
     }
 
-    m = sum / (N * N); // Calculate average
+    m = sum / (N * N); 
     while (amax <= N * m) 
     {
-        // Adjust amax to satisfy the condition
         i = rand() % N;
         j = rand() % N;
         Array[i * N + j] += (N * m - amax + 1);
