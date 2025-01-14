@@ -441,27 +441,29 @@ void create2DArray1(int *Array)
     int sum = 0;
     int amax = 0;
     int i, j, m;
+
     printf("Array B\n");
-    for (i = 0; i < N; ++i) 
-    {
-        for (j = 0; j < N; ++j) 
-        {
+
+    // Initialize the array with random values and calculate `sum` and `amax`
+    for (i = 0; i < N; ++i) {
+        for (j = 0; j < N; ++j) {
             Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
             sum += Array[i * N + j];
-            if (Array[i * N + j] > amax) 
-            {
+            if (Array[i * N + j] > amax) {
                 amax = Array[i * N + j];
             }
         }
     }
 
     m = sum / (N * N); // Calculate average
-    while (amax <= N * m) 
-    {
-        // Adjust amax to satisfy the condition
+
+    // Ensure the condition `amax > N * m`
+    if (amax <= N * m) {
+        // Select a random element and increase its value
         i = rand() % N;
         j = rand() % N;
-        Array[i * N + j] += (N * m - amax + 1);
+        int adjustment = (N * m - amax + 1); // Calculate the adjustment needed
+        Array[i * N + j] += adjustment;
         amax = Array[i * N + j];
     }
 }
