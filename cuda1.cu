@@ -178,8 +178,7 @@ __global__ void createC(int *d_A, float *d_outArr)
 
 }
 
-void create2DArray1(int *Array);
-void create2DArray2(int *Array);
+void create2DArray(int *Array);
 
 int main(int argc, char *argv[])
 {
@@ -285,10 +284,7 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    if (rand() % 2 == 0)
-        create2DArray1(h_A);
-    else
-        create2DArray2(h_A);
+    create2DArray(h_A);
 
 /******************* ΠΑΡΑΛΛΗΛΑ ***************/
     err = cudaEventRecord(startAll, 0);
@@ -436,101 +432,32 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void create2DArray1(int *Array) {
+void create2DArray(int *Array)
+{
     int sum = 0;
     int amax = 0;
     int i, j, m;
 
-    printf("Array B\n");
-
-    // Initialize the array with random values
-    for (i = 0; i < N; ++i) {
-        for (j = 0; j < N; ++j) {
+    for (i = 0; i < N; ++i) 
+    {
+        for (j = 0; j < N; ++j) 
+        {
             Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
             sum += Array[i * N + j];
-            if (Array[i * N + j] > amax) {
+            if (Array[i * N + j] > amax) 
+            {
                 amax = Array[i * N + j];
             }
         }
     }
 
-    m = sum / (N * N); // Initial calculation of average
-
-    // Adjust `amax` to satisfy the condition `amax > N * m`
-    while (amax <= N * m) {
-        // Recompute sum and average
-        sum = 0;
-        for (i = 0; i < N; ++i) {
-            for (j = 0; j < N; ++j) {
-                sum += Array[i * N + j];
-            }
-        }
-        m = sum / (N * N);
-
-        // Find the current maximum value and adjust it
-        amax = 0;
-        for (i = 0; i < N; ++i) {
-            for (j = 0; j < N; ++j) {
-                if (Array[i * N + j] > amax) {
-                    amax = Array[i * N + j];
-                }
-            }
-        }
-
-        // Adjust the maximum element
+    m = sum / (N * N); // Calculate average
+    while (amax <= N * m) 
+    {
+        // Adjust amax to satisfy the condition
         i = rand() % N;
         j = rand() % N;
         Array[i * N + j] += (N * m - amax + 1);
+        amax = Array[i * N + j];
     }
 }
-
-void create2DArray2(int *Array) {
-    int sum = 0;
-    int amax = 0;
-    int i, j, m;
-
-    printf("Array C\n");
-
-    // Initialize the array with random values
-    for (i = 0; i < N; ++i) {
-        for (j = 0; j < N; ++j) {
-            Array[i * N + j] = rand() % 100 + 1; // Random number between 1 and 100
-            sum += Array[i * N + j];
-            if (Array[i * N + j] > amax) {
-                amax = Array[i * N + j];
-            }
-        }
-    }
-
-    m = sum / (N * N); // Initial calculation of average
-
-    // Adjust `amax` to satisfy the condition `amax <= N * m`
-    while (amax > N * m) {
-        // Recompute sum and average
-        sum = 0;
-        for (i = 0; i < N; ++i) {
-            for (j = 0; j < N; ++j) {
-                sum += Array[i * N + j];
-            }
-        }
-        m = sum / (N * N);
-
-        // Find the current maximum value
-        amax = 0;
-        for (i = 0; i < N; ++i) {
-            for (j = 0; j < N; ++j) {
-                if (Array[i * N + j] > amax) {
-                    amax = Array[i * N + j];
-                }
-            }
-        }
-
-        // Adjust the maximum element
-        i = rand() % N;
-        j = rand() % N;
-        if (Array[i * N + j] > 1) {
-            Array[i * N + j] -= (amax - N * m);
-        }
-    }
-}
-
