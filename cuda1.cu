@@ -285,6 +285,7 @@ int main(int argc, char *argv[])
     srand(time(NULL));
 
     create2DArray(h_A);
+    printf("The array A has been stored in file %s\n", argv[1]);
 
 // ============== Έναρξη Παράλληλου Υπολογισμού ==============
 
