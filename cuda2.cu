@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 
     if (argc != 4)
     {
-        printf("Usage: %s A.txt A_means A_cov.txt\n", argv[0]);
+        printf("Usage: %s A.txt A_means.txt A_cov.txt\n", argv[0]);
         exit(1);
     }
 
