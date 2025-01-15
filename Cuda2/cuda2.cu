@@ -27,21 +27,21 @@
  * Επιστρέφει: Τίποτα.
  * 
  * Περιγραφή:
- *   Η συνάρτηση αυτή υπολογίζει τον μέσο όρο κάθε στήλης του πίνακα `d_A` και αποθηκεύει
- *   τα αποτελέσματα στον πίνακα `d_Amean`. Κάθε νήμα είναι υπεύθυνο για μία στήλη του πίνακα.
+ *   Η συνάρτηση αυτή υπολογίζει τον μέσο όρο κάθε στήλης του πίνακα d_A και αποθηκεύει
+ *   τα αποτελέσματα στον πίνακα d_Amean. Κάθε νήμα είναι υπεύθυνο για μία στήλη του πίνακα.
  */
 __global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Υπολογισμός του δείκτη της στήλης (global)
+    int row; // Δείκτης γραμμής
 
-    if (col >= N) return; // Βεβαιωνόμαστε ότι δεν ξεπερνάμε τα όρια του πίνακα
+    if (col >= N) return; // Εξασφαλίζουμε ότι δε ξεπερνάμε τα όρια του πίνακα
 
     float sum = 0.0f;
 
     // Υπολογισμός του αθροίσματος της στήλης
-    for (int row = 0; row < N; ++row) {
+    for (row = 0; row < N; ++row) 
         sum += d_A[row * N + col];
-    }
 
     // Αποθήκευση του αποτελέσματος στον πίνακα εξόδου
     d_Amean[col] = sum / N; // Υπολογισμός του μέσου όρου
@@ -52,22 +52,23 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
  * === Συνάρτηση: subMeansT ===
  * Παράμετροι: 
  *   - d_A: Ο πίνακας εισόδου (Device) με ακέραια στοιχεία.
- *   - d_Amean: Ο πίνακας εισόδου (Device) που περιέχει τους μέσους όρους των στηλών του `d_A`.
- *   - d_Asubmeans: Ο πίνακας εξόδου (Device) που αποθηκεύει τα στοιχεία του `d_A` αφού αφαιρεθεί ο μέσος όρος.
- *   - d_ATsubmeans: Ο μετασχηματισμένος πίνακας εξόδου (Device) που περιέχει τη μεταφορά του `d_Asubmeans`.
+ *   - d_Amean: Ο πίνακας εισόδου (Device) που περιέχει τους μέσους όρους των στηλών του d_A.
+ *   - d_Asubmeans: Ο πίνακας εξόδου (Device) που αποθηκεύει τα στοιχεία του d_A αφού αφαιρεθεί ο μέσος όρος.
+ *   - d_ATsubmeans: Ο ανάστροφος πίνακας εξόδου (Device) που περιέχει τη μεταφορά του d_Asubmeans.
  * Επιστρέφει: Τίποτα.
  * 
  * Περιγραφή:
- *   Η συνάρτηση αυτή αφαιρεί τον μέσο όρο κάθε στήλης του πίνακα `d_A` από τα στοιχεία της
- *   και αποθηκεύει τα αποτελέσματα στον πίνακα `d_Asubmeans`. Επιπλέον, υπολογίζει και αποθηκεύει
- *   τη μεταφορά του πίνακα `d_Asubmeans` στον πίνακα `d_ATsubmeans`.
+ *   Η συνάρτηση αυτή αφαιρεί τον μέσο όρο κάθε στήλης του πίνακα d_A από τα στοιχεία της
+ *   και αποθηκεύει τα αποτελέσματα στον πίνακα d_Asubmeans. Επιπλέον, υπολογίζει και αποθηκεύει
+ *   τη μεταφορά του πίνακα d_Asubmeans στον πίνακα `d_ATsubmeans`.
  */
 __global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y; // Υπολογισμός του δείκτη της γραμμής (global)
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Υπολογισμός του δείκτη της στήλης (global)
 
-    if (row < N && col < N) {
+    if (row < N && col < N) 
+    {
         // Αφαίρεση του μέσου όρου από κάθε στοιχείο και αποθήκευση
         d_Asubmeans[row * N + col] = d_A[row * N + col] - d_Amean[col];
         // Υπολογισμός και αποθήκευση της μεταφοράς του πίνακα
@@ -83,7 +84,7 @@ __global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d
  * Επιστρέφει: Τίποτα.
  * 
  * Περιγραφή:
- *   Η συνάρτηση αυτή υπολογίζει τον πίνακα συνδιακύμανσης για τα δεδομένα του `d_Asubmeans`.
+ *   Η συνάρτηση αυτή υπολογίζει τον πίνακα συνδιακύμανσης για τα δεδομένα του d_Asubmeans.
  *   Υπολογίζονται μόνο τα στοιχεία του άνω τριγωνικού μέρους του πίνακα συνδιακύμανσης,
  *   καθώς ο πίνακας είναι συμμετρικός.
  */
@@ -91,14 +92,16 @@ __global__ void calcCov(float *d_Asubmeans, float *d_Acov)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y; // Υπολογισμός δείκτη γραμμής στον πίνακα συνδιακύμανσης
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Υπολογισμός δείκτη στήλης στον πίνακα συνδιακύμανσης
+    float sum; // Αθροιστής
+    int k; // Δείκτης επανάληψης
 
-    if (row < N && col < N && row <= col) { // Υπολογισμός μόνο για το άνω τριγωνικό μέρος
-        float sum = 0.0f;
+    if (row < N && col < N && row <= col) // Υπολογισμός μόνο για το άνω τριγωνικό μέρος του πίνακα
+    { 
+        sum = 0.0f;
 
         // Υπολογισμός του εσωτερικού γινομένου για τη γραμμή `row` και τη στήλη `col`
-        for (int k = 0; k < N; ++k) {
+        for (k = 0; k < N; ++k) 
             sum += d_Asubmeans[row * N + k] * d_Asubmeans[col * N + k];
-        }
 
         // Αποθήκευση του αποτελέσματος στον πίνακα συνδιακύμανσης
         d_Acov[row * N + col] = sum;
@@ -248,20 +251,20 @@ int main(int argc, char *argv[])
     dim3 dimGrid(nBlocks, nBlocks);
 
 /* 
- * === Εκτέλεση Kernel: calcColMeans<<<dimGrid, dimBlock>>> ===
+ * === Εκτέλεση Kernel: calcColMeans<<<nBlocks, nThreads>>> ===
  * Σκοπός:
- *   - Υπολογίζει τον μέσο όρο κάθε στήλης του πίνακα `d_A` και αποθηκεύει τα αποτελέσματα στον πίνακα `d_Amean`.
+ *   - Υπολογίζει τον μέσο όρο κάθε στήλης του πίνακα d_A και αποθηκεύει τα αποτελέσματα στον πίνακα d_Amean.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
  *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: 1, Z: 1).
  *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: 1, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
- *   - `cudaMemcpy(h_Amean, d_Amean, n * sizeof(float), cudaMemcpyDeviceToHost)` ανακτά τον υπολογισμένο πίνακα μέσων όρων από τη συσκευή στη μνήμη του host.
+ *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
+ *   - cudaMemcpy(h_Amean, d_Amean, n * sizeof(float), cudaMemcpyDeviceToHost) ανακτά τον υπολογισμένο πίνακα μέσων όρων από τη συσκευή στη μνήμη του host.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
  *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
@@ -277,6 +280,8 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_Amean, d_Amean, n * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Amean, d_Amean, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
+    printf("The array A_means has been stored in file %s\n", argv[3]);
+
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
     err = cudaEventElapsedTime(&elapsedTime1, start, stop);
@@ -287,21 +292,21 @@ int main(int argc, char *argv[])
 /* 
  * === Εκτέλεση Kernel: subMeansT<<<dimGrid, dimBlock>>> ===
  * Σκοπός:
- *   - Υπολογίζει τη διαφορά κάθε στοιχείου του πίνακα `d_A` από τον μέσο όρο της στήλης του 
- *     και αποθηκεύει τα αποτελέσματα στον πίνακα `d_Asubmeans`.
- *   - Δημιουργεί τον μετασχηματισμένο (τρανσποζέ) πίνακα `d_ATsubmeans` βασισμένο στον πίνακα `d_Asubmeans`.
+ *   - Υπολογίζει τη διαφορά κάθε στοιχείου του πίνακα d_A από τον μέσο όρο της στήλης του 
+ *     και αποθηκεύει τα αποτελέσματα στον πίνακα d_Asubmeans.
+ *   - Δημιουργεί τον ανάστροφο πίνακα d_ATsubmeans βασισμένο στον πίνακα d_Asubmeans.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
  *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
  *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
- *   - `cudaMemcpy(h_Asubmeans, d_Asubmeans, floatBytes, cudaMemcpyDeviceToHost)` ανακτά τον πίνακα `d_Asubmeans` από τη μνήμη της συσκευής στη μνήμη του host.
- *   - `cudaMemcpy(h_ATsubmeans, d_ATsubmeans, floatBytes, cudaMemcpyDeviceToHost)` ανακτά τον πίνακα `d_ATsubmeans` από τη μνήμη της συσκευής στη μνήμη του host.
+ *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
+ *   - cudaMemcpy(h_Asubmeans, d_Asubmeans, floatBytes, cudaMemcpyDeviceToHost) ανακτά τον πίνακα d_Asubmeans από τη μνήμη της συσκευής στη μνήμη του host.
+ *   - cudaMemcpy(h_ATsubmeans, d_ATsubmeans, floatBytes, cudaMemcpyDeviceToHost) ανακτά τον πίνακα d_ATsubmeans από τη μνήμη της συσκευής στη μνήμη του host.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
  *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
@@ -319,6 +324,9 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_ATsubmeans, d_ATsubmeans, floatBytes, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_ATsubmeans, d_ATsubmeans, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
+    printf("The array A_submeans has been stored in file %s\n", argv[4]);
+    printf("The array AT_submeans has been stored in file %s\n", argv[5]);
+
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
     err = cudaEventElapsedTime(&elapsedTime2, start, stop);
@@ -329,18 +337,18 @@ int main(int argc, char *argv[])
 /* 
  * === Εκτέλεση Kernel: calcCov<<<dimGrid, dimBlock>>> ===
  * Σκοπός:
- *   - Υπολογίζει τον πίνακα συνδιακύμανσης `d_Acov` από τον πίνακα τιμών `d_Asubmeans`, 
- *     ο οποίος περιέχει τις τιμές του αρχικού πίνακα με αφαιρεμένο τον μέσο όρο κάθε στήλης.
+ *   - Υπολογίζει τον πίνακα συνδιακύμανσης d_Acov από τον πίνακα τιμών d_Asubmeans, 
+ *     ο οποίος περιέχει τις τιμές του αρχικού πίνακα με αφαιρημένους τον μέσο όρο κάθε στήλης.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
  *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
  *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(h_Acov, d_Acov, floatBytes, cudaMemcpyDeviceToHost)` ανακτά τον υπολογισμένο πίνακα συνδιακύμανσης από τη μνήμη της συσκευής στη μνήμη του host.
+ *   - cudaMemcpy(h_Acov, d_Acov, floatBytes, cudaMemcpyDeviceToHost) ανακτά τον υπολογισμένο πίνακα συνδιακύμανσης από τη μνήμη της συσκευής στη μνήμη του host.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
  *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
@@ -355,6 +363,8 @@ int main(int argc, char *argv[])
 
     err = cudaMemcpy(h_Acov, d_Acov, floatBytes, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Acov, d_Acov, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+    printf("The array A_cov has been stored in file %s\n", argv[6]);
 
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }

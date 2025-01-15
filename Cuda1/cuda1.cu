@@ -20,7 +20,7 @@
 #define nBlocks (int)ceil((float)N/nThreads)
 
 /*
- *  === Συνάρτηση: calcAvg ===
+ *  === Συνάρτηση Πυρήνα: calcAvg ===
  *  Παράμετροι: 
  *      - d_A: Πίνακας εισόδου (Device).
  *      - d_sum: Το άθροισμα των στοιχείων του πίνακα (Device).
@@ -29,18 +29,18 @@
  * 
  *  Περιγραφή:
  *      Υπολογίζει το άθροισμα και τον μέσο όρο όλων των στοιχείων του πίνακα A
- *      χρησιμοποιώντας παράλληλο υπολογισμό με CUDA.
+ *      με χρήση reduction και atomic εντολών.
  */
 __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg) 
 {
-    __shared__ int cache[nThreads];  // Κοινή μνήμη για κάθε block
+    __shared__ int cache[nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
-    // Υπολογισμός παγκόσμιου δείκτη γραμμής και στήλης
+    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
     int totalElements = N * N;
-    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
+    int tid = i * N + j; // Global index για τον 2D πίνακα
 
     if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
@@ -49,46 +49,46 @@ __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg)
 
     __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Εκτέλεση παράλληλης μείωσης εντός του block
+    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο νήματα με έγκυρους δείκτες εκτελούν μείωση
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο threads με έγκυρα Id εκτελούν reduction
             cache[threadIdx.x + threadIdx.y * blockDim.x] += 
                 cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         __syncthreads();  // Συγχρονισμός νημάτων στο block
-        k /= 2;
+        k /= 2; 
     }
 
-    // Ατομική προσθήκη στο συνολικό άθροισμα εάν το νήμα είναι το πρώτο στο block
+    // Χρήση atomic λειτουργίας πρόσθεσης στο συνολικό άθροισμα εάν το νήμα είναι το πρώτο στο block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicAdd(d_sum, cache[0]);
 
-    // Υπολογισμός του μέσου όρου μετά τη μείωση
+    // Υπολογισμός του μέσου όρου μετά το reduction
     if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0)
         *d_avg = (float)(*d_sum) / totalElements;
 }
 
 
 /*
- *  === Συνάρτηση: findMax ===
+ *  === Συνάρτηση Πυρήνα: findMax ===
  *  Παράμετροι: 
  *      - d_A: Πίνακας εισόδου (Device).
  *      - d_amax: Το μέγιστο στοιχείο του πίνακα A (Device).
  *  Επιστρέφει: Τίποτα.
  * 
  *  Περιγραφή:
- *      Υπολογίζει το μέγιστο στοιχείο του πίνακα A χρησιμοποιώντας παράλληλο υπολογισμό.
+ *      Υπολογίζει το μέγιστο στοιχείο του πίνακα A χρησιμοποιώντας reduction και atomic εντολές.
  */
 __global__ void findMax(int *d_A, int *d_amax)
 {
-    __shared__ int cache[nThreads];  // Κοινή μνήμη για κάθε block
+    __shared__ int cache[nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
-    // Υπολογισμός παγκόσμιου δείκτη γραμμής και στήλης
+    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
+    int tid = i * N + j; // Global index για τον 2D πίνακα
 
     if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
@@ -97,11 +97,11 @@ __global__ void findMax(int *d_A, int *d_amax)
 
     __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Εκτέλεση παράλληλης μείωσης εντός του block
+    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο νήματα με έγκυρους δείκτες εκτελούν μείωση
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο threads με έγκυρα Id εκτελούν reduction
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
@@ -109,13 +109,13 @@ __global__ void findMax(int *d_A, int *d_amax)
         k /= 2;
     }
 
-    // Ατομική μέγιστη τιμή στο συνολικό μέγιστο αν αυτό το νήμα είναι το πρώτο στο block
+    // Χρήση atomic λειτουργίας εύρεσης μέγιστου στοιχείου στο συνολικό μέγιστο αν αυτό το νήμα είναι το πρώτο στο block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicMax(d_amax, cache[0]);
 }
 
 
-// Custom atomicMin για αριθμούς κινητής υποδιαστολής
+// Custom atomicMin για αριθμούς κινητής υποδιαστολής με χρήση atomicCAS
 __device__ void atomicMin(float *address, float val)
 {
     int *address_as_i = (int *) address;  // Μετατροπή της διεύθυνσης σε ακέραιο δείκτη
@@ -145,17 +145,18 @@ __device__ void atomicMin(float *address, float val)
  *  Επιστρέφει: Τίποτα.
  * 
  *  Περιγραφή:
- *      Υπολογίζει τον πίνακα B με στοιχεία \( B_{ij} = \frac{m - A_{ij}}{a_{max}} \)
- *      και βρίσκει το ελάχιστο στοιχείο του.
+ *      Υπολογίζει τον πίνακα B με στοιχεία  Bij = (m - Aij) / amax, όπου m είναι ο μέσος όρος των στοιχείων του Α 
+ *      και βρίσκει το ελάχιστο στοιχείο του με χρήση reduction και atomic εντολών.
  */
 __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, float *d_avg)
 {
-    __shared__ float cache[nThreads];  // Κοινή μνήμη για την εκτέλεση της μείωσης
+    __shared__ float cache[nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
+    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Υπολογισμός της αντίστοιχης τιμής για το B_ij
+    // Υπολογισμός της αντίστοιχης τιμής για το Bij
     if (i < N && j < N)
     {
         if (*d_amax != 0)
@@ -164,7 +165,7 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
             d_outArr[i * N + j] = 0.0; // Διαχείριση της διαίρεσης με το μηδέν
     }
 
-    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
+    int tid = i * N + j; // Global index για τον 2D πίνακα
 
     // Φόρτωση δεδομένων στην κοινή μνήμη (cache)
     if (i < N && j < N)  
@@ -174,8 +175,8 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
 
     __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Εκτέλεση παράλληλης μείωσης εντός του block
-    int k = blockDim.x * blockDim.y / 2;  // Μείωση κατά το ήμισυ των συνολικών νημάτων
+    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
+    int k = blockDim.x * blockDim.y / 2;  // Μείωση κατά το μισό των συνολικών νημάτων
     while (k != 0) 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < k) 
@@ -185,10 +186,10 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         }
         __syncthreads();  // Συγχρονισμός νημάτων
-        k /= 2;  // Μείωση του βήματος κατά το ήμισυ σε κάθε επανάληψη
+        k /= 2;  // Μείωση του βήματος κατά το μισό σε κάθε επανάληψη
     }
 
-    // Ατομική ενημέρωση για την ελάχιστη τιμή του πίνακα B χρησιμοποιώντας την custom atomicMin
+    // Χρήση atomic λειτουργίας για την ελάχιστη τιμή του πίνακα B χρησιμοποιώντας την custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicMin(d_bmin, cache[0]);  // Χρήση της custom atomicMin για αριθμούς κινητής υποδιαστολής
 }
@@ -202,20 +203,22 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
  * 
  *  Περιγραφή:
  *      Υπολογίζει τον πίνακα C με στοιχεία 
- *      \( C_{ij} = \frac{A_{ij} + A_{i(j+1)} + A_{i(j-1)}}{3} \), λαμβάνοντας υπόψη
- *      την κυκλική γειτονία.
+ *      Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3, λαμβάνοντας υπόψη
+ *      εάν j+1=N τότε Ai(j+1)=Ai0, ενώ εάν j-1=-1 τότε Ai(j-1)=Ai(Ν-1).
  */
 __global__ void createC(int *d_A, float *d_outArr)
 {
+    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
+    
     int left, right, current;
 
     // Έλεγχος αν βρισκόμαστε εντός ορίων
     if (i < N && j < N)
     {
-        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Αριστερός γείτονας (διαχείριση συνόρων)
-        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Δεξιός γείτονας (διαχείριση συνόρων)
+        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Αριστερό στοιχείο(διαχείριση ορίων)
+        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Δεξιό στοιχείο (διαχείριση ορίων)
         current = d_A[i * N + j];  // Τρέχον στοιχείο
         
         // Υπολογισμός του Cij
@@ -238,7 +241,7 @@ int main(int argc, char *argv[])
     int n, threadsPerBlock, blocksPerGrid;                           // Το μέγεθος του πίνακα, τα νήματα ανά μπλοκ και τα μπλοκ ανά πλέγμα
     int intBytes, floatBytes;                                        // Το μέγεθος των πινάκων σε bytes
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ; // Οι μέγιστες τιμές για τα νήματα και τις διαστάσεις των μπλοκ
-    int max_grid_dimX, max_grid_dimY, max_grid_dimZ;                 // Οι μέγιστες τιμές για τις διαστάσεις των πλέγματων
+    int max_grid_dimX, max_grid_dimY, max_grid_dimZ;                 // Οι μέγιστες τιμές για τις διαστάσεις των πλεγμάτων
     int i, j;                                                        // Δείκτες επανάληψης
     FILE *fpA, *fpOutArr;                                            // Δείκτες αρχείων για την αποθήκευση των πινάκων Α και Β ή C
     char arr;                                                        // Το όνομα του πίνακα Β ή C
@@ -331,7 +334,7 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    // Δημιουργία τυχαίου πίνακα Α
+    // Δημιουργία πίνακα Α με πρόγραμμα γεννήτριας τυχαίων αριθμών
     create2DArray(h_A);
     printf("The array A has been stored in file %s\n", argv[1]);
 
@@ -344,7 +347,7 @@ int main(int argc, char *argv[])
     err = cudaEventCreate(&stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
 
-    // Δέσμευση μνήμης στη συσκευή
+    // Δέσμευση μνήμης στη συσκευή (Device)
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
     err = cudaMalloc((void **) &d_OutArr, floatBytes);
@@ -358,29 +361,29 @@ int main(int argc, char *argv[])
     err = cudaMalloc((void **) &d_bmin, sizeof(float)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_bmin, sizeof(int)) failed."); exit(1); }
 
-    // Δημιουργία 2D grid με 2D block
+    // Δημιουργία 2D grid με 2D blocks
     dim3 dimBlock(nThreads, nThreads);
     dim3 dimGrid(nBlocks, nBlocks);
 
 /* 
  * === Εκτέλεση Kernel: calcAvg<<<dimGrid, dimBlock>>> ===
  * Σκοπός:
- *   - Υπολογίζει το άθροισμα όλων των στοιχείων του πίνακα `d_A` και υπολογίζει τον μέσο όρο τους.
+ *   - Υπολογίζει το άθροισμα όλων των στοιχείων του πίνακα d_A και υπολογίζει τον μέσο όρο τους.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
- *   - `cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice)` μεταφέρει τη μεταβλητή αρχικοποίησης του αθροίσματος στη συσκευή.
- *   - `cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost)` ανακτά τον υπολογισμένο μέσο όρο από τη συσκευή στη μνήμη του host.
+ *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
+ *   - cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice) μεταφέρει τη μεταβλητή αρχικοποίησης του αθροίσματος στη συσκευή.
+ *   - cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost) ανακτά τον υπολογισμένο μέσο όρο από τη συσκευή στη μνήμη του host.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess)
+ *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
  */
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
@@ -408,21 +411,21 @@ int main(int argc, char *argv[])
 /* 
  * === Εκτέλεση Kernel: findMax<<<dimGrid, dimBlock>>> ===
  * Σκοπός:
- *   - Υπολογίζει το μέγιστο στοιχείο του πίνακα `d_A` και το αποθηκεύει στη μεταβλητή `d_amax`.
+ *   - Υπολογίζει το μέγιστο στοιχείο του πίνακα d_A και το αποθηκεύει στη μεταβλητή d_amax.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` (προηγούμενη κλήση): Μεταφέρει τον πίνακα εισόδου στη μνήμη της συσκευής.
- *   - `cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost)`: Ανακτά το μέγιστο στοιχείο από τη συσκευή στη μνήμη του host.
+ *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) (προηγούμενη κλήση): Μεταφέρει τον πίνακα εισόδου στη μνήμη της συσκευής.
+ *   - cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost): Ανακτά το μέγιστο στοιχείο από τη συσκευή στη μνήμη του host.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess)
+ *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
  */
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start,0) failed."); exit(1); }
@@ -447,31 +450,28 @@ int main(int argc, char *argv[])
 /* 
  * === Εκτέλεση Kernel: createB ή createC ===
  * Σκοπός:
- *   - Αν η συνθήκη (*h_amax > N * (*h_avg)) ικανοποιείται:
- *       - Εκτελείται το kernel `createB` για τον υπολογισμό του πίνακα B με τιμές
- *         \( B_{ij} = \frac{\text{m} - A_{ij}}{\text{a}_{\text{max}}} \).
+ *   - Αν η συνθήκη (amax > N * m) ικανοποιείται:
+ *       - Εκτελείται η συνάρτηση kernel createB για τον υπολογισμό του πίνακα B με τιμές
+ *         Bij = (m - Aij) / amax.
  *       - Βρίσκεται επίσης το ελάχιστο στοιχείο του πίνακα B.
  *   - Αν η συνθήκη δεν ικανοποιείται:
- *       - Εκτελείται το kernel `createC` για τον υπολογισμό του πίνακα C με τιμές
- *         \( C_{ij} = \frac{A_{ij} + A_{i(j+1)} + A_{i(j-1)}}{3} \).
+ *       - Εκτελείται η συνάρτηση kernel createC για τον υπολογισμό του πίνακα C με τιμές
+ *         Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3.
  *
  * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
  * 
  * Μεταφορές Μνήμης:
- *   - `cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost)`: Ανακτά τον πίνακα εξόδου (B ή C) από τη μνήμη της συσκευής στη μνήμη του host.
- *   - Αν εκτελείται το kernel `createB`:
- *       - `cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost)`: Ανακτά το ελάχιστο στοιχείο του πίνακα B.
+ *   - cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost): Ανακτά τον πίνακα εξόδου (B ή C) από τη μνήμη της συσκευής στη μνήμη του host.
+ *   - Αν εκτελείται η συνάρτηση kernel createB:
+ *       - cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost): Ανακτά το ελάχιστο στοιχείο του πίνακα B.
  *
- * Χρονισμός:
- *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ * Μέτρηση απόδοσης:
+ *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
  *
  * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση API της CUDA ακολουθείται από έλεγχο σφάλματος για να διασφαλιστεί η επιτυχής εκτέλεση.
- *
- * Παραδοχές:
- *   - Οι πίνακες έχουν αρχικοποιηθεί και οι διαστάσεις είναι έγκυρες.
+ *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
  */
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
@@ -570,7 +570,8 @@ int main(int argc, char *argv[])
  * 
  *  Περιγραφή:
  *      Δημιουργεί έναν τυχαίο πίνακα διαστάσεων NxN με τιμές στο διάστημα [1, 100].
- *      Εξασφαλίζει ότι το μέγιστο στοιχείο του πίνακα είναι μεγαλύτερο από το Ν επί τον μέσο όρο του πίνακα.
+ *      Εξασφαλίζει ότι το μέγιστο στοιχείο του πίνακα είναι μεγαλύτερο ή μικρότερο από το Ν επί τον 
+ *      μέσο όρο του πίνακα.
  */
 void create2DArray(int *Array)
 {
