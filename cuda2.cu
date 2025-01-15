@@ -52,24 +52,24 @@ __global__ void calcCov(int *d_A, float *d_Acov)
 int main(int argc, char *argv[])
 {
     int *h_A;
-    float *h_Acov, *h_Amean;
+    float *h_Acov, *h_Amean, *h_Asubmeans, *h_ATsubmeans;
     int *d_A;
-    float *d_Acov, *d_Amean;
+    float *d_Acov, *d_Amean, *d_Asubmeans, *d_ATsubmeans;
 
     int n, threadsPerBlock, blocksPerGrid;
     int intBytes, floatBytes;
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     int i, j;
-    FILE *fpA, *fpAcov, *fpAmean;
+    FILE *fpA, *fpAcov, *fpAsubmeans, *fpATsubmeans *fpAmean;
     float elapsedTime;
 
     cudaEvent_t start, stop;
     cudaError_t err;
     cudaDeviceProp prop;
 
-    if (argc != 4)
+    if (argc != 6)
     {
-        printf("Usage: %s A.txt A_means.txt A_cov.txt\n", argv[0]);
+        printf("Usage: %s A.txt A_means.txt A_submeans.txt AT_submeans.txt A_cov.txt\n", argv[0]);
         exit(1);
     }
 
@@ -109,8 +109,12 @@ int main(int argc, char *argv[])
     if (fpA == NULL) { printf("Cannot open file %s\n", argv[1]); exit(1); }
     fpAmean = fopen(argv[2], "w");
     if (fpAmean == NULL) { printf("Cannot open file %s\n", argv[2]); exit(1); }
-    fpAcov = fopen(argv[3], "w");
-    if (fpAcov == NULL) { printf("Cannot open file %s\n", argv[3]); exit(1); }
+    fpAsubmeans = fopen(argv[3], "w");
+    if (fpAsubmeans == NULL) { printf("Cannot open file %s\n", argv[3]); exit(1); }
+    fpATsubmeans = fopen(argv[4], "w");
+    if (fpATsubmeans == NULL) { printf("Cannot open file %s\n", argv[4]); exit(1); }
+    fpAcov = fopen(argv[5], "w");
+    if (fpAcov == NULL) { printf("Cannot open file %s\n", argv[5]); exit(1); }
 
     err = cudaEventCreate(&start);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
@@ -128,10 +132,14 @@ int main(int argc, char *argv[])
 
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
-    h_Acov = (float *) malloc(floatBytes);
-    if (h_Acov == NULL) { printf("Error --> Memory allocation failed for A_cov.\n"); exit(1); }
     h_Amean = (float *) malloc(n * sizeof(float));
     if (h_Amean == NULL) { printf("Error --> Memory allocation failed for A_mean.\n"); exit(1); }
+    h_Asubmeans = (float *) malloc(floatBytes);
+    if (h_Asubmeans == NULL) { printf("Error --> Memory allocation failed for A_submeans.\n"); exit(1); }
+    h_ATsubmeans = (float *) malloc(floatBytes);
+    if (h_ATsubmeans == NULL) { printf("Error --> Memory allocation failed for AT_submeans.\n"); exit(1); }
+    h_Acov = (float *) malloc(floatBytes);
+    if (h_Acov == NULL) { printf("Error --> Memory allocation failed for A_cov.\n"); exit(1); }
 
     //srand(time(NULL));
 
@@ -141,6 +149,8 @@ int main(int argc, char *argv[])
         {
             h_A[i * n + j] = rand() % 199 - 99;                           // Τιμές στο διάστημα [-99, 99]
             h_A[i * n + j] = h_A[i * n + j] >= 0 ? h_A[i * n + j] + 10 : h_A[i * n + j] - 10;  // Τυχαία επιλογή προσήμου
+            h_Asubmeans[i * n + j] = 0.0;
+            h_ATsubmeans[i * n + j] = 0.0;
             h_Acov[i * n + j] = 0.0;
         }
         h_Amean[i] = 0.0;
@@ -148,10 +158,14 @@ int main(int argc, char *argv[])
     
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
-    err = cudaMalloc((void **) &d_Acov, floatBytes);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Acov, bytes) failed."); exit(1); }
     err = cudaMalloc((void **) &d_Amean, n * sizeof(float));
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Amean, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_Asubmeans, floatBytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Asubmeans, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_ATsubmeans, floatBytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_ATsubmeans, bytes) failed."); exit(1); }
+    err = cudaMalloc((void **) &d_Acov, floatBytes);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_Acov, bytes) failed."); exit(1); }
 
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
@@ -176,9 +190,15 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
+            //fprintf(fpAsubmeans, "%4.2f ", h_Asubmeans[i * n + j]);
+            //fprintf(fpATsubmeans, "%4.2f ", h_ATsubmeans[i * n + j]);
+            //fprintf(fpAcov, "%4.2f ", h_Acov[i * n + j]);
         }
-        fprintf(fpAmean, "%10.2f\n", h_Amean[i]);
+        fprintf(fpAmean, "%4.2f\n", h_Amean[i]);
         fprintf(fpA, "\n");
+        //fprintf(fpAsubmeans, "\n");
+        //fprintf(fpATsubmeans, "\n");
+        //fprintf(fpAcov, "\n");
     }
 
 
