@@ -19,7 +19,7 @@
 #define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void calcColMeans2D(int *d_A, float *d_Amean) 
+__global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
     // Use a 2D grid and block
     int col = blockIdx.x;              // Each block processes one column
