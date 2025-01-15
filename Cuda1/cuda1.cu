@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 
     // Δημιουργία 2D grid με 2D blocks
     dim3 dimBlock(nThreads, nThreads);
-    dim3 dimGrid(nBlocks, nBlocks);
+    dim3 dimGrid(N/nBlocks, N/nBlocks);
 
 /* 
  * === Εκτέλεση Kernel: calcAvg<<<dimGrid, dimBlock>>> ===
