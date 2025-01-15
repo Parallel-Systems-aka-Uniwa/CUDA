@@ -1,4 +1,0 @@
-cuda1@rncp-ubuntu:~/CUDA/Cuda1$ nvcc -o cuda1 cuda1.cu
-ptxas error   : Entry function '_Z7createBPiPfS0_S_S0_' uses too much shared data (0x400000 bytes, 0x18000 max)
-ptxas error   : Entry function '_Z7findMaxPiS_' uses too much shared data (0x400000 bytes, 0x18000 max)
-ptxas error   : Entry function '_Z7calcAvgPiS_Pf' uses too much shared data (0x400000 bytes, 0x18000 max)
