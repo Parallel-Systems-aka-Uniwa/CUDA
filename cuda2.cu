@@ -16,7 +16,7 @@
 #include <cuda.h>
 
 #define N 8
-#define nThreads 8
+#define nThreads 16
 #define nBlocks (int)ceil((float)N/nThreads)
 
 __global__ void calcColMeans(int *d_A, float *d_Amean) 
