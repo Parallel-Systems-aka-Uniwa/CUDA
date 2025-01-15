@@ -201,12 +201,19 @@ int main(int argc, char *argv[])
     cudaError_t err;                                                 // Κωδικός σφάλματος CUDA
     cudaDeviceProp prop;                                             // Τα χαρακτηριστικά της συσκευής
 
+/*
+ *  Έλεγχος των ορισμάτων εισόδου
+ */
     if (argc != 3)
     {
         printf("Usage: %s A.txt OutArr.txt\n", argv[0]);
         exit(1);
     }
 
+/*
+ *  
+ */
+    // Επιβεβαιώνουμε ότι οι παράμετροι είναι ακέραιοι
     n = N;
     threadsPerBlock = nThreads;
     blocksPerGrid = nBlocks;

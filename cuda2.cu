@@ -29,26 +29,32 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 
     float sum = 0.0f;
 
-    // Loop through rows of the column in chunks equal to blockDim.x
-    for (int i = row; i < N; i += stride) 
+    // Process rows of the column using a while loop
+    int i = row; // Start from the current thread's row
+    while (i < N) 
+    {
         sum += d_A[i * N + col];
-    
+        i += stride; // Move to the next row assigned to this thread
+    }
 
     cache[threadIdx.x] = sum; // Store local sum in shared memory
     __syncthreads();
 
-    // Perform parallel reduction within the block
-    for (int s = blockDim.x / 2; s > 0; s /= 2) 
+    // Perform parallel reduction within the block using a while loop
+    int s = blockDim.x / 2; // Start with half the block size
+    while (s > 0) 
     {
         if (threadIdx.x < s) 
             cache[threadIdx.x] += cache[threadIdx.x + s];
         __syncthreads();
+        s /= 2; // Halve the stride
     }
 
     // The first thread in the block writes the final result
     if (threadIdx.x == 0) 
         d_Amean[col] = cache[0] / N;
 }
+
 
 
 __global__ void subMeans(int *d_A, float *d_Amean)
