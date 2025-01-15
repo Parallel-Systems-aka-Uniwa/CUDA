@@ -39,7 +39,7 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 }
 
 
-__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans, int N)
+__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y; // Global row index
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Global column index
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     int intBytes, floatBytes;
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     int i, j;
-    FILE *fpA, *fpAcov, *fpAsubmeans, *fpATsubmeans *fpAmean;
+    FILE *fpA, *fpAcov, *fpAsubmeans, *fpATsubmeans, *fpAmean;
     float elapsedTime1, elapsedTime2, elapsedTime3;
 
     cudaEvent_t start, stop;
@@ -233,18 +233,23 @@ int main(int argc, char *argv[])
     }
 
 
-    printf("Time for the kernel: %f ms\n", elapsedTime);
-
     free(h_A);
     free(h_Acov);
     free(h_Amean);
+    free(h_Asubmeans);
+    free(h_ATsubmeans);
+    
     cudaFree(d_A);
     cudaFree(d_Acov);
     cudaFree(d_Amean);
+    cudaFree(d_Asubmeans);
+    cudaFree(d_ATsubmeans);
 
     fclose(fpA);
     fclose(fpAmean);
     fclose(fpAcov);
+    fclose(fpAsubmeans);
+    fclose(fpATsubmeans);
 
     return 0;
 }
