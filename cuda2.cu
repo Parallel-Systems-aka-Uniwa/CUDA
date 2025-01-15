@@ -21,7 +21,9 @@
 
 __global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
-     int col = blockIdx.x;  // Block index along the x-axis corresponds to the column
+    __shared__ float cache[nThreads]; // Shared memory for partial sums
+
+    int col = blockIdx.x;  // Block index along the x-axis corresponds to the column
     int local_thread_id = threadIdx.x + threadIdx.y * blockDim.x; // Local thread index
     int total_threads = blockDim.x * blockDim.y; // Total threads in a block
     int thread_row = threadIdx.y + blockIdx.y * blockDim.y; // Global row index
