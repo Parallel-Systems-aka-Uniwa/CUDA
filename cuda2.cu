@@ -58,15 +58,17 @@ __global__ void calcCov(float *d_Asubmeans, float *d_ATsubmeans, float *d_Acov)
     int thread_id = threadIdx.x;
     int row_stride = gridDim.x;
     int col_stride = blockDim.x;
+    int i, j;
+    float thread_result;
     
-    for (int i = block_id; i < size_y; i += row_stride) 
+    for (i = block_id; i < size_y; i += row_stride) 
     {
-        float thread_result = 0;
+        thread_result = 0;
         if (thread_id == 0) 
             block_result = 0;
     }
     // Κάθε νήμα επιτελεί τους υπολογισμούς του
-    for (int j = thread_id; j < size_x; j += col_stride) 
+    for (j = thread_id; j < size_x; j += col_stride) 
         thread_result += d_Asubmeans[i * N + j] * d_ATsubmeans[i * N + j];
     
     // Κάθε νήμα ενημερώνει το μπλοκ με το τοπικό του αποτέλεσμα
