@@ -1,0 +1,1 @@
+Usage: ./cuda1 A.txt OutArr.txt
