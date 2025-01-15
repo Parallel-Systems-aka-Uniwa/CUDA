@@ -39,8 +39,7 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 }
 
 
-
-__global__ void subMeans(int *d_A, float *d_Amean)
+__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
 {
 
 }
@@ -61,7 +60,7 @@ int main(int argc, char *argv[])
     int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ, max_grid_dimX, max_grid_dimY, max_grid_dimZ;
     int i, j;
     FILE *fpA, *fpAcov, *fpAsubmeans, *fpATsubmeans *fpAmean;
-    float elapsedTime;
+    float elapsedTime1, elapsedTime2, elapsedTime3;
 
     cudaEvent_t start, stop;
     cudaError_t err;
@@ -173,9 +172,10 @@ int main(int argc, char *argv[])
     dim3 dimBlock(nThreads, nThreads);
     dim3 dimGrid(nBlocks, nBlocks);
 
+/* 1st kernel launch */
+
     cudaEventRecord(start, 0);
 
-    // Κλήση του kernel
     calcColMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
 
     cudaEventRecord(stop, 0);
