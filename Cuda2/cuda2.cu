@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_Amean, d_Amean, n * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Amean, d_Amean, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("The array A_means has been stored in file %s\n", argv[3]);
+    printf("The array A_means has been stored in file %s\n", argv[2]);
 
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
@@ -380,11 +380,11 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            fprintf(fpAsubmeans, "%4.2f ", h_Asubmeans[i * n + j]);
-            fprintf(fpATsubmeans, "%4.2f ", h_ATsubmeans[i * n + j]);
-            fprintf(fpAcov, "%4.2f ", h_Acov[i * n + j]);
+            fprintf(fpAsubmeans, "%4.4f ", h_Asubmeans[i * n + j]);
+            fprintf(fpATsubmeans, "%4.4f ", h_ATsubmeans[i * n + j]);
+            fprintf(fpAcov, "%4.4f ", h_Acov[i * n + j]);
         }
-        fprintf(fpAmean, "%4.2f\n", h_Amean[i]);
+        fprintf(fpAmean, "%4.4f\n", h_Amean[i]);
         fprintf(fpA, "\n");
         fprintf(fpAsubmeans, "\n");
         fprintf(fpATsubmeans, "\n");
