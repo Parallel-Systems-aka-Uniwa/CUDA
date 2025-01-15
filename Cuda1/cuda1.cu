@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop,0) failed."); exit(1); }
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     printf("Average: %4.2f\n", *h_avg);
 
