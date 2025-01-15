@@ -21,38 +21,21 @@
 
 __global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
-    __shared__ float cache[nThreads]; // Shared memory for partial sums
+    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
 
-    int col = blockIdx.x;  // Block index along the x-axis corresponds to the column
-    int local_thread_id = threadIdx.x + threadIdx.y * blockDim.x; // Local thread index
-    int total_threads = blockDim.x * blockDim.y; // Total threads in a block
-    int thread_row = threadIdx.y + blockIdx.y * blockDim.y; // Global row index
+    int col = blockIdx.x * blockDim.x + threadIdx.x; // Global column index
+
+    if (col >= N) return; // Ensure we don't go out of bounds
 
     float sum = 0.0f;
 
-    // Accumulate sum for this thread's portion of the column
-    if (thread_row < N) { // Ensure we are within matrix bounds
-        sum += d_A[thread_row * N + col];
+    // Compute the sum of the column
+    for (int row = 0; row < N; ++row) {
+        sum += d_A[row * N + col];
     }
 
-    // Store partial sum in shared memory
-    cache[local_thread_id] = sum;
-    __syncthreads();
-
-    // Perform parallel reduction in shared memory
-    int s = total_threads / 2;
-    while (s > 0) {
-        if (local_thread_id < s) {
-            cache[local_thread_id] += cache[local_thread_id + s];
-        }
-        __syncthreads();
-        s /= 2;
-    }
-
-    // Write the final mean for the column
-    if (local_thread_id == 0) {
-        d_Amean[col] = cache[0] / N; // Final mean for this column
-    }
+    // Store the result in the output array
+    d_Amean[col] = sum / N; // Calculate the mean
 }
 
 
@@ -173,13 +156,13 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
 
-    dim3 dimBlock(nThreads, nThreads);  // 4x4 threads per block
-    dim3 dimGrid(N / nThreads, 1);      // Grid spans 1 row of blocks, one block per column
+    dim3 dimBlock(nThreads, nThreads);
+    dim3 dimGrid(nBlocks, nBlocks);
 
     cudaEventRecord(start, 0);
 
     // Κλήση του kernel
-    calcColMeans<<<dimGrid, dimBlock>>>(d_A, d_Amean);
+    calcColMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
