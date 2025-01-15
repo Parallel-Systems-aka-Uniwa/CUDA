@@ -1,0 +1,1 @@
+Usage: ./cuda2 A.txt A_means.txt A_submeans.txt AT_submeans.txt A_cov.txt
