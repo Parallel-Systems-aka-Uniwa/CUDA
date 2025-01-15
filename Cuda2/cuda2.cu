@@ -324,8 +324,8 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_ATsubmeans, d_ATsubmeans, floatBytes, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_ATsubmeans, d_ATsubmeans, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("The array A_submeans has been stored in file %s\n", argv[4]);
-    printf("The array AT_submeans has been stored in file %s\n", argv[5]);
+    printf("The array A_submeans has been stored in file %s\n", argv[3]);
+    printf("The array AT_submeans has been stored in file %s\n", argv[4]);
 
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
@@ -364,7 +364,7 @@ int main(int argc, char *argv[])
     err = cudaMemcpy(h_Acov, d_Acov, floatBytes, cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Acov, d_Acov, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
 
-    printf("The array A_cov has been stored in file %s\n", argv[6]);
+    printf("The array A_cov has been stored in file %s\n", argv[5]);
 
     err = cudaEventSynchronize(stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
