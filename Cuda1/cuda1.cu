@@ -524,7 +524,7 @@ int main(int argc, char *argv[])
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            fprintf(fpOutArr, "%4.2f ", h_OutArr[i * n + j]);
+            fprintf(fpOutArr, "%4.4f ", h_OutArr[i * n + j]);
         }
 
         fprintf(fpA, "\n");
