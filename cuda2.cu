@@ -39,7 +39,7 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 }
 
 
-__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
+__global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
 {
     int row = blockIdx.y * blockDim.y + threadIdx.y; // Global row index
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Global column index
@@ -53,8 +53,36 @@ __global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_
 }
 
 
-__global__ void calcCov(int *d_A, float *d_Acov)
+__global__ void calcCov(float *d_Asubmeans, float *d_ATsubmeans, float *d_Acov)
 {
+    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
+    int tid = threadIdx.x + blockIdx.x * blockDim.x;
+    int cacheIndex = threadIdx.x;
+
+    float   temp = 0;
+    while (tid < N) {
+        temp += d_Asubmeans[tid] * d_ATsubmeans[tid];
+        tid += blockDim.x * gridDim.x;
+    }
+    
+    // set the cache values
+    cache[cacheIndex] = temp;
+    
+    // synchronize threads in this block
+    __syncthreads();
+
+    // for reductions, threadsPerBlock must be a power of 2
+    // because of the following code
+    int i = blockDim.x/2;
+    while (i != 0) {
+        if (cacheIndex < i)
+            cache[cacheIndex] += cache[cacheIndex + i];
+        __syncthreads();
+        i /= 2;
+    }
+
+    if (cacheIndex == 0)
+        d_Acov[blockIdx.x] = cache[0];
 }
 
 int main(int argc, char *argv[])
@@ -201,7 +229,7 @@ int main(int argc, char *argv[])
 
     cudaEventRecord(start, 0);
 
-    subMeans<<<dimGrid, dimBlock>>>(d_A, d_Amean, d_Asubmeans, d_ATsubmeans);
+    subMeansT<<<dimGrid, dimBlock>>>(d_A, d_Amean, d_Asubmeans, d_ATsubmeans);
 
     cudaEventRecord(stop, 0);
 
@@ -216,6 +244,19 @@ int main(int argc, char *argv[])
 
 /* 3rd kernel launch */
 
+    cudaEventRecord(start, 0);
+
+    calcCov<<<nBlocks, nThreads>>>(d_Asubmeans, d_ATsubmeans, d_Acov);
+
+    cudaEventRecord(stop, 0);
+
+    err = cudaMemcpy(h_Acov, d_Acov, floatBytes, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Acov, d_Acov, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsedTime3, start, stop);
+    printf("Time for the kernel calcCov<<<>>>(): %f ms\n", elapsedTime3);
+
     for (i = 0; i < n; i++)
     {
         for (j = 0; j < n; j++)
@@ -223,13 +264,13 @@ int main(int argc, char *argv[])
             fprintf(fpA, "%4d ", h_A[i * n + j]);
             fprintf(fpAsubmeans, "%4.2f ", h_Asubmeans[i * n + j]);
             fprintf(fpATsubmeans, "%4.2f ", h_ATsubmeans[i * n + j]);
-            //fprintf(fpAcov, "%4.2f ", h_Acov[i * n + j]);
+            fprintf(fpAcov, "%4.2f ", h_Acov[i * n + j]);
         }
         fprintf(fpAmean, "%4.2f\n", h_Amean[i]);
         fprintf(fpA, "\n");
         fprintf(fpAsubmeans, "\n");
         fprintf(fpATsubmeans, "\n");
-        //fprintf(fpAcov, "\n");
+        fprintf(fpAcov, "\n");
     }
 
 
