@@ -39,10 +39,19 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
 }
 
 
-__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans)
+__global__ void subMeans(int *d_A, float *d_Amean, float *d_Asubmeans, float *d_ATsubmeans, int N)
 {
+    int row = blockIdx.y * blockDim.y + threadIdx.y; // Global row index
+    int col = blockIdx.x * blockDim.x + threadIdx.x; // Global column index
 
+    if (row < N && col < N) {
+        // Subtract the mean from each element and store it
+        d_Asubmeans[row * N + col] = d_A[row * N + col] - d_Amean[col];
+        // Transpose the matrix for the inverted operation
+        d_ATsubmeans[col * N + row] = d_Asubmeans[row * N + col];
+    }
 }
+
 
 __global__ void calcCov(int *d_A, float *d_Acov)
 {
@@ -179,25 +188,47 @@ int main(int argc, char *argv[])
     calcColMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
 
     cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime, start, stop);
+
 
     err = cudaMemcpy(h_Amean, d_Amean, n * sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Amean, d_Amean, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsedTime1, start, stop);
+    printf("Time for the kernel calcColMeans<<<>>>(): %f ms\n", elapsedTime1);
+
+/* 2nd kernel launch */
+
+    cudaEventRecord(start, 0);
+
+    subMeans<<<dimGrid, dimBlock>>>(d_A, d_Amean, d_Asubmeans, d_ATsubmeans);
+
+    cudaEventRecord(stop, 0);
+
+    err = cudaMemcpy(h_Asubmeans, d_Asubmeans, floatBytes, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_Asubmeans, d_Asubmeans, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+    err = cudaMemcpy(h_ATsubmeans, d_ATsubmeans, floatBytes, cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(h_ATsubmeans, d_ATsubmeans, bytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
+
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsedTime2, start, stop);
+    printf("Time for the kernel subMeans<<<>>>(): %f ms\n", elapsedTime2);
+
+/* 3rd kernel launch */
 
     for (i = 0; i < n; i++)
     {
         for (j = 0; j < n; j++)
         {
             fprintf(fpA, "%4d ", h_A[i * n + j]);
-            //fprintf(fpAsubmeans, "%4.2f ", h_Asubmeans[i * n + j]);
-            //fprintf(fpATsubmeans, "%4.2f ", h_ATsubmeans[i * n + j]);
+            fprintf(fpAsubmeans, "%4.2f ", h_Asubmeans[i * n + j]);
+            fprintf(fpATsubmeans, "%4.2f ", h_ATsubmeans[i * n + j]);
             //fprintf(fpAcov, "%4.2f ", h_Acov[i * n + j]);
         }
         fprintf(fpAmean, "%4.2f\n", h_Amean[i]);
         fprintf(fpA, "\n");
-        //fprintf(fpAsubmeans, "\n");
-        //fprintf(fpATsubmeans, "\n");
+        fprintf(fpAsubmeans, "\n");
+        fprintf(fpATsubmeans, "\n");
         //fprintf(fpAcov, "\n");
     }
 
