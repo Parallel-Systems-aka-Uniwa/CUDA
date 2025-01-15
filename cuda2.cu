@@ -51,37 +51,24 @@ __global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d
 }
 
 
-__global__ void calcCov(float *d_Asubmeans, float *d_ATsubmeans, float *d_Acov)
+__global__ void calcCov(float *d_Asubmeans, float *d_Acov)
 {
-    __shared__ float block_result;
-    int row = blockIdx.x; // Each block processes one row
-    int col = threadIdx.x + blockIdx.y * blockDim.x; // Thread processes part of the column
-    int thread_id = threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y; // Row index in the covariance matrix
+    int col = blockIdx.x * blockDim.x + threadIdx.x; // Column index in the covariance matrix
 
-    if (row < N && col < N && row <= col) { // Ensure bounds and upper triangular part
-        float thread_result = 0;
+    if (row < N && col < N && row <= col) { // Only compute upper triangular part
+        float sum = 0.0f;
 
-        // Each thread computes part of the dot product for (row, col)
-        for (int k = thread_id; k < N; k += blockDim.x) {
-            thread_result += d_Asubmeans[row * N + k] * d_ATsubmeans[col * N + k];
+        // Compute the dot product of row `row` and column `col`
+        for (int k = 0; k < N; ++k) {
+            sum += d_Asubmeans[row * N + k] * d_Asubmeans[col * N + k];
         }
 
-        // Use shared memory to sum up results within the block
-        if (thread_id == 0)
-            block_result = 0.0f;
-
-        __syncthreads();
-
-        atomicAdd(&block_result, thread_result);
-
-        __syncthreads();
-
-        // First thread writes the result to the global memory
-        if (thread_id == 0) {
-            d_Acov[row * N + col] = block_result;
-        }
+        // Store the result in the covariance matrix
+        d_Acov[row * N + col] = sum;
     }
 }
+
 
 
 int main(int argc, char *argv[])
@@ -245,7 +232,7 @@ int main(int argc, char *argv[])
 
     cudaEventRecord(start, 0);
 
-    calcCov<<<dimGrid, dimBlock>>>(d_Asubmeans, d_ATsubmeans, d_Acov);
+    calcCov<<<dimGrid, dimBlock>>>(d_Asubmeans, d_Acov);
 
     cudaEventRecord(stop, 0);
 
