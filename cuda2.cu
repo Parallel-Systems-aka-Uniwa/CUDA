@@ -21,8 +21,6 @@
 
 __global__ void calcColMeans(int *d_A, float *d_Amean) 
 {
-    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
-
     int col = blockIdx.x * blockDim.x + threadIdx.x; // Global column index
 
     if (col >= N) return; // Ensure we don't go out of bounds
