@@ -26,7 +26,7 @@ __global__ void calcColMeans(int *d_A, float *d_Amean)
     int row = threadIdx.x + threadIdx.y * blockDim.x; // Flatten thread indices
     int stride = blockDim.x * blockDim.y; // Total threads in the block
 
-    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
+    __shared__ float cache[nThreads * nThreads]; // Dynamically allocated shared memory
 
     float sum = 0.0f;
 
