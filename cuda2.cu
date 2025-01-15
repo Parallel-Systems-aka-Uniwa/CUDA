@@ -16,43 +16,43 @@
 #include <cuda.h>
 
 #define N 8
-#define nThreads 16
+#define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
-__global__ void calcColMeans(int *d_A, float *d_Amean) 
+__global__ void calcColMeans2D(int *d_A, float *d_Amean) 
 {
-    __shared__ float cache[nThreads];  // Shared memory for block reduction
+    // Use a 2D grid and block
+    int col = blockIdx.x;              // Each block processes one column
+    int row = threadIdx.x + threadIdx.y * blockDim.x; // Flatten thread indices
+    int stride = blockDim.x * blockDim.y; // Total threads in the block
 
-    int col = blockIdx.x; // Each block works on one column
-    int row = threadIdx.x; // Threads within the block work on rows
-    int stride = blockDim.x; // Stride for rows in a column
+    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
 
     float sum = 0.0f;
 
-    // Process rows of the column using a while loop
-    int i = row; // Start from the current thread's row
-    while (i < N) 
-    {
+    // Accumulate sum for this thread's portion of the column
+    int i = row;
+    while (i < N) {
         sum += d_A[i * N + col];
         i += stride; // Move to the next row assigned to this thread
     }
 
-    cache[threadIdx.x] = sum; // Store local sum in shared memory
+    // Store the partial sum in shared memory
+    cache[row] = sum;
     __syncthreads();
 
-    // Perform parallel reduction within the block using a while loop
-    int s = blockDim.x / 2; // Start with half the block size
-    while (s > 0) 
-    {
-        if (threadIdx.x < s) 
-            cache[threadIdx.x] += cache[threadIdx.x + s];
+    // Perform parallel reduction in shared memory
+    for (int s = stride / 2; s > 0; s /= 2) {
+        if (row < s) {
+            cache[row] += cache[row + s];
+        }
         __syncthreads();
-        s /= 2; // Halve the stride
     }
 
-    // The first thread in the block writes the final result
-    if (threadIdx.x == 0) 
+    // Write the final mean for the column
+    if (row == 0) {
         d_Amean[col] = cache[0] / N;
+    }
 }
 
 
@@ -150,6 +150,8 @@ int main(int argc, char *argv[])
     h_Amean = (float *) malloc(n * sizeof(float));
     if (h_Amean == NULL) { printf("Error --> Memory allocation failed for A_mean.\n"); exit(1); }
 
+    //srand(time(NULL));
+
     for (i = 0; i < n; i++)
     {
         for (j = 0; j < n; j++)
@@ -177,7 +179,7 @@ int main(int argc, char *argv[])
     cudaEventRecord(start, 0);
 
     // Κλήση του kernel
-    calcColMeans<<<nBlocks, nThreads>>>(d_A, d_Amean);
+    calcColMeans<<<dimGrid, dimBlock>>>(d_A, d_Amean);
 
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
