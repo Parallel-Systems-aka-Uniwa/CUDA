@@ -53,34 +53,32 @@ __global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d
 
 __global__ void calcCov(float *d_Asubmeans, float *d_ATsubmeans, float *d_Acov)
 {
-    __shared__ float cache[nThreads]; // Dynamically allocated shared memory
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-    int cacheIndex = threadIdx.x;
-
-    float   temp = 0;
-    while (tid < N) {
-        temp += d_Asubmeans[tid] * d_ATsubmeans[tid];
-        tid += blockDim.x * gridDim.x;
+    __shared__ float block_result;
+    int block_id = blockIdx.x;
+    int thread_id = threadIdx.x;
+    int row_stride = gridDim.x;
+    int col_stride = blockDim.x;
+    
+    for (int i = block_id; i < size_y; i += row_stride) 
+    {
+        float thread_result = 0;
+        if (thread_id == 0) 
+            block_result = 0;
     }
+    // Κάθε νήμα επιτελεί τους υπολογισμούς του
+    for (int j = thread_id; j < size_x; j += col_stride) 
+        thread_result += d_Asubmeans[i * N + j] * d_ATsubmeans[i * N + j];
     
-    // set the cache values
-    cache[cacheIndex] = temp;
+    // Κάθε νήμα ενημερώνει το μπλοκ με το τοπικό του αποτέλεσμα
+    atomicAdd(&block_result, thread_result);
     
-    // synchronize threads in this block
+    // Αναμονή μέχρι να ολοκληρώσουν όλα τα νήματα την ενημέρωση
     __syncthreads();
-
-    // for reductions, threadsPerBlock must be a power of 2
-    // because of the following code
-    int i = blockDim.x/2;
-    while (i != 0) {
-        if (cacheIndex < i)
-            cache[cacheIndex] += cache[cacheIndex + i];
-        __syncthreads();
-        i /= 2;
-    }
-
-    if (cacheIndex == 0)
-        d_Acov[blockIdx.x] = cache[0];
+    
+    // Ένα από τα νήματα ενημερώνει τον κεντρικό πίνακα στην καθολική
+    // μνήμη με το αποτέλεσμα του μπλοκ
+    if (thread_id == 0)
+        d_Acov[i * N + j] = block_result;    
 }
 
 int main(int argc, char *argv[])
