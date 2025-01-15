@@ -19,128 +19,163 @@
 #define nThreads 4
 #define nBlocks (int)ceil((float)N/nThreads)
 
+/*
+ *  === Συνάρτηση: calcAvg ===
+ *  Παράμετροι: 
+ *      - d_A: Πίνακας εισόδου (Device).
+ *      - d_sum: Το άθροισμα των στοιχείων του πίνακα (Device).
+ *      - d_avg: Ο μέσος όρος των στοιχείων του πίνακα (Device).
+ *  Επιστρέφει: Τίποτα.
+ * 
+ *  Περιγραφή:
+ *      Υπολογίζει το άθροισμα και τον μέσο όρο όλων των στοιχείων του πίνακα A
+ *      χρησιμοποιώντας παράλληλο υπολογισμό με CUDA.
+ */
 __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg) 
 {
-    __shared__ int cache[nThreads];  // Shared memory for each block
+    __shared__ int cache[nThreads];  // Κοινή μνήμη για κάθε block
 
-    // Calculate global row and column index
+    // Υπολογισμός παγκόσμιου δείκτη γραμμής και στήλης
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
     int totalElements = N * N;
-    int tid = i * N + j; // Global index for 2D array
+    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
 
-    if (i < N && j < N)  // Ensure within bounds
+    if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Αποφυγή ανάγνωσης εκτός ορίων
 
-    __syncthreads();  // Synchronize threads in the block
+    __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Perform parallel reduction within the block
+    // Εκτέλεση παράλληλης μείωσης εντός του block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid indices reduce
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο νήματα με έγκυρους δείκτες εκτελούν μείωση
             cache[threadIdx.x + threadIdx.y * blockDim.x] += 
                 cache[threadIdx.x + threadIdx.y * blockDim.x + k];
-        __syncthreads();  // Synchronize threads in the block
+        __syncthreads();  // Συγχρονισμός νημάτων στο block
         k /= 2;
     }
 
-    // Atomic addition to the global sum if this thread is the first in the block
+    // Ατομική προσθήκη στο συνολικό άθροισμα εάν το νήμα είναι το πρώτο στο block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicAdd(d_sum, cache[0]);
 
-    // Calculate average after reduction
+    // Υπολογισμός του μέσου όρου μετά τη μείωση
     if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0)
         *d_avg = (float)(*d_sum) / totalElements;
 }
 
 
+/*
+ *  === Συνάρτηση: findMax ===
+ *  Παράμετροι: 
+ *      - d_A: Πίνακας εισόδου (Device).
+ *      - d_amax: Το μέγιστο στοιχείο του πίνακα A (Device).
+ *  Επιστρέφει: Τίποτα.
+ * 
+ *  Περιγραφή:
+ *      Υπολογίζει το μέγιστο στοιχείο του πίνακα A χρησιμοποιώντας παράλληλο υπολογισμό.
+ */
 __global__ void findMax(int *d_A, int *d_amax)
 {
-    __shared__ int cache[nThreads];  // Shared memory for each block
+    __shared__ int cache[nThreads];  // Κοινή μνήμη για κάθε block
 
-    // Calculate global row and column index
+    // Υπολογισμός παγκόσμιου δείκτη γραμμής και στήλης
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int tid = i * N + j; // Global index for 2D array
+    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
 
-    if (i < N && j < N)  // Ensure within bounds
+    if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Αποφυγή ανάγνωσης εκτός ορίων
 
-    __syncthreads();  // Synchronize threads in the block
+    __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Perform parallel reduction within the block
+    // Εκτέλεση παράλληλης μείωσης εντός του block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid indices reduce
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο νήματα με έγκυρους δείκτες εκτελούν μείωση
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
-        __syncthreads();  // Synchronize threads in the block
+        __syncthreads();  // Συγχρονισμός νημάτων στο block
         k /= 2;
     }
 
-    // Atomic max to the global max if this thread is the first in the block
+    // Ατομική μέγιστη τιμή στο συνολικό μέγιστο αν αυτό το νήμα είναι το πρώτο στο block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicMax(d_amax, cache[0]);
 }
 
-// Custom atomicMin for floats
+
+// Custom atomicMin για αριθμούς κινητής υποδιαστολής
 __device__ void atomicMin(float *address, float val)
 {
-    int *address_as_i = (int *) address;
+    int *address_as_i = (int *) address;  // Μετατροπή της διεύθυνσης σε ακέραιο δείκτη
     int old = *address_as_i, assumed;
 
-    // Convert the float value to its integer representation
+    // Μετατροπή της τιμής κινητής υποδιαστολής σε ακέραια αναπαράσταση
     int val_as_int = __float_as_int(val);
 
     do
     {
         assumed = old;
-        // Perform atomicCAS on the integer representation
+        // Εκτέλεση atomicCAS στη δεκαδική αναπαράσταση
         old = atomicCAS(address_as_i, assumed, min(val_as_int, assumed));
     } 
-    while (assumed != old);
+    while (assumed != old);  // Επανάληψη μέχρι να μην αλλάξει η τιμή
 }
 
 
-
-// Βij = (m–Aij)/amax
+/*
+ *  === Συνάρτηση: createB ===
+ *  Παράμετροι: 
+ *      - d_A: Πίνακας εισόδου (Device).
+ *      - d_outArr: Πίνακας εξόδου B (Device).
+ *      - d_bmin: Το ελάχιστο στοιχείο του πίνακα B (Device).
+ *      - d_amax: Το μέγιστο στοιχείο του πίνακα A (Device).
+ *      - d_avg: Ο μέσος όρος των στοιχείων του πίνακα A (Device).
+ *  Επιστρέφει: Τίποτα.
+ * 
+ *  Περιγραφή:
+ *      Υπολογίζει τον πίνακα B με στοιχεία \( B_{ij} = \frac{m - A_{ij}}{a_{max}} \)
+ *      και βρίσκει το ελάχιστο στοιχείο του.
+ */
 __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, float *d_avg)
 {
-    __shared__ float cache[nThreads];  // Shared memory for reduction
+    __shared__ float cache[nThreads];  // Κοινή μνήμη για την εκτέλεση της μείωσης
 
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Calculate the corresponding value for B_ij
+    // Υπολογισμός της αντίστοιχης τιμής για το B_ij
     if (i < N && j < N)
     {
         if (*d_amax != 0)
             d_outArr[i * N + j] = (*d_avg - (float) d_A[i * N + j]) / (float) *d_amax;
         else
-            d_outArr[i * N + j] = 0.0; // Handle division by zero
+            d_outArr[i * N + j] = 0.0; // Διαχείριση της διαίρεσης με το μηδέν
     }
 
-    int tid = i * N + j; // Global index for 2D array
+    int tid = i * N + j; // Παγκόσμιος δείκτης για τον 2D πίνακα
 
-    // Load data into shared memory (cache)
+    // Φόρτωση δεδομένων στην κοινή μνήμη (cache)
     if (i < N && j < N)  
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a large number as placeholder for out-of-bounds threads
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Χρήση μεγάλης τιμής ως προσωρινή τιμή για νήματα εκτός ορίων
 
-    __syncthreads();  // Synchronize threads in the block
+    __syncthreads();  // Συγχρονισμός νημάτων στο block
 
-    // Perform parallel reduction within the block
-    int k = blockDim.x * blockDim.y / 2;  // Half of the total threads
+    // Εκτέλεση παράλληλης μείωσης εντός του block
+    int k = blockDim.x * blockDim.y / 2;  // Μείωση κατά το ήμισυ των συνολικών νημάτων
     while (k != 0) 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < k) 
@@ -149,34 +184,45 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
                 cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         }
-        __syncthreads();  // Synchronize threads
-        k /= 2;  // Half the stride each iteration
+        __syncthreads();  // Συγχρονισμός νημάτων
+        k /= 2;  // Μείωση του βήματος κατά το ήμισυ σε κάθε επανάληψη
     }
 
-    // Atomic update for global minimum value using the custom atomicMin
+    // Ατομική ενημέρωση για την ελάχιστη τιμή του πίνακα B χρησιμοποιώντας την custom atomicMin
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, cache[0]);  // Use custom atomicMin with float values
+        atomicMin(d_bmin, cache[0]);  // Χρήση της custom atomicMin για αριθμούς κινητής υποδιαστολής
 }
 
-// Cij = (Aij+Ai(j+1)+Ai(j-1))/3
+/*
+ *  === Συνάρτηση: createC ===
+ *  Παράμετροι: 
+ *      - d_A: Πίνακας εισόδου (Device).
+ *      - d_outArr: Πίνακας εξόδου C (Device).
+ *  Επιστρέφει: Τίποτα.
+ * 
+ *  Περιγραφή:
+ *      Υπολογίζει τον πίνακα C με στοιχεία 
+ *      \( C_{ij} = \frac{A_{ij} + A_{i(j+1)} + A_{i(j-1)}}{3} \), λαμβάνοντας υπόψη
+ *      την κυκλική γειτονία.
+ */
 __global__ void createC(int *d_A, float *d_outArr)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int left, right, current;
 
-    // Check if within bounds
+    // Έλεγχος αν βρισκόμαστε εντός ορίων
     if (i < N && j < N)
     {
-        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Left neighbor (handle boundary)
-        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Right neighbor (handle boundary)
-        current = d_A[i * N + j];  // Current element
+        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Αριστερός γείτονας (διαχείριση συνόρων)
+        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Δεξιός γείτονας (διαχείριση συνόρων)
+        current = d_A[i * N + j];  // Τρέχον στοιχείο
         
-        // Compute Cij
+        // Υπολογισμός του Cij
         d_outArr[i * N + j] = (float) (current + left + right) / 3.0;
     }
-
 }
+
 
 void create2DArray(int *Array);
 
@@ -201,25 +247,23 @@ int main(int argc, char *argv[])
     cudaError_t err;                                                 // Κωδικός σφάλματος CUDA
     cudaDeviceProp prop;                                             // Τα χαρακτηριστικά της συσκευής
 
-/*
- *  Έλεγχος των ορισμάτων εισόδου
- */
+    // Έλεγχος αριθμού παραμέτρων γραμμής εντολών
     if (argc != 3)
     {
         printf("Usage: %s A.txt OutArr.txt\n", argv[0]);
         exit(1);
     }
 
-/*
- *  
- */
-    // Επιβεβαιώνουμε ότι οι παράμετροι είναι ακέραιοι
+    // Αρχικοποίηση παραμέτρων
     n = N;
     threadsPerBlock = nThreads;
     blocksPerGrid = nBlocks;
 
-    cudaGetDeviceProperties(&prop, 0); 
+    // Λήψη ιδιοτήτων συσκευής CUDA
+    err = cudaGetDeviceProperties(&prop, 0); 
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaGetDeviceProperties failed.\n"); exit(1); }
 
+    // Ανάθεση μέγιστων τιμών από τις ιδιότητες της συσκευής
     max_threads = prop.maxThreadsPerBlock;
     max_block_dimX = prop.maxThreadsDim[0];
     max_block_dimY = prop.maxThreadsDim[1];
@@ -228,6 +272,7 @@ int main(int argc, char *argv[])
     max_grid_dimY = prop.maxGridSize[1];
     max_grid_dimZ = prop.maxGridSize[2];
 
+    // Εκτύπωση χαρακτηριστικών συσκευής
     printf("--------------- Device Properties ---------------\n");
     printf("Device name           : %s\n", prop.name);
     printf("Max threads per block : %d\n", max_threads);
@@ -235,6 +280,7 @@ int main(int argc, char *argv[])
     printf("Max grid dimensions   : %d x %d x %d\n", max_grid_dimX, max_grid_dimY, max_grid_dimZ);
     printf("-------------------------------------------------\n");
 
+    // Έλεγχος έγκυρων τιμών για τις παραμέτρους
     if (n < 1)
     { printf("Error --> Matrix size must be at least 1\n"); exit(1); }
     if (threadsPerBlock < 1)
@@ -246,25 +292,24 @@ int main(int argc, char *argv[])
     if (blocksPerGrid > max_grid_dimX)
     { printf("Error --> Blocks per grid (grid size) exceed maximum allowed for %s\n", prop.name); exit(1); }
 
+    // Άνοιγμα αρχείων για αποθήκευση των πινάκων
     fpA = fopen(argv[1], "w");
     if (fpA == NULL) { printf("Cannot open file %s\n", argv[1]); exit(1); }
     fpOutArr = fopen(argv[2], "w");
     if (fpOutArr == NULL) { printf("Cannot open file %s\n", argv[2]); exit(1); }
 
-    err = cudaEventCreate(&start);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
-    err = cudaEventCreate(&stop);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
-
+    // Εκτύπωση παραμέτρων εισόδου
     printf("--------------- Input Parameters ---------------\n");
     printf("Matrix size        : %d x %d\n", n, n);
     printf("Blocks per Grid    : %d\n", blocksPerGrid);
     printf("Threads per Block  : %d\n", threadsPerBlock);
     printf("------------------------------------------------\n");
 
+    // Υπολογισμός μεγέθους πινάκων σε bytes
     intBytes = n * n * sizeof(int);
     floatBytes = n * n * sizeof(float);
 
+    // Δέσμευση μνήμης για τους πίνακες στη μνήμη του Host
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
     h_OutArr = (float *) malloc(floatBytes);
@@ -278,6 +323,7 @@ int main(int argc, char *argv[])
     h_sum = (int *) malloc(sizeof(int));
     if (h_sum == NULL) { printf("Error --> Memory allocation failed for sum.\n"); exit(1); }
 
+    // Αρχικοποίηση μεταβλητών
     *h_sum = 0;
     *h_avg = 0.0;
     *h_amax = 0;
@@ -285,11 +331,20 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
+    // Δημιουργία τυχαίου πίνακα Α
     create2DArray(h_A);
     printf("The array A has been stored in file %s\n", argv[1]);
 
+
 // ============== Έναρξη Παράλληλου Υπολογισμού ==============
 
+    // Δημιουργία CUDA events για μέτρηση χρόνου
+    err = cudaEventCreate(&start);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
+    err = cudaEventCreate(&stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
+
+    // Δέσμευση μνήμης στη συσκευή
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
     err = cudaMalloc((void **) &d_OutArr, floatBytes);
@@ -303,47 +358,121 @@ int main(int argc, char *argv[])
     err = cudaMalloc((void **) &d_bmin, sizeof(float)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_bmin, sizeof(int)) failed."); exit(1); }
 
+    // Δημιουργία 2D grid με 2D block
     dim3 dimBlock(nThreads, nThreads);
     dim3 dimGrid(nBlocks, nBlocks);
 
-/* 1η κλήση Kernel */
-
+/* 
+ * === Εκτέλεση Kernel: calcAvg<<<dimGrid, dimBlock>>> ===
+ * Σκοπός:
+ *   - Υπολογίζει το άθροισμα όλων των στοιχείων του πίνακα `d_A` και υπολογίζει τον μέσο όρο τους.
+ *
+ * Διαμόρφωση Πλέγματος και Μπλοκ:
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ * 
+ * Μεταφορές Μνήμης:
+ *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
+ *   - `cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice)` μεταφέρει τη μεταβλητή αρχικοποίησης του αθροίσματος στη συσκευή.
+ *   - `cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost)` ανακτά τον υπολογισμένο μέσο όρο από τη συσκευή στη μνήμη του host.
+ *
+ * Χρονισμός:
+ *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ *
+ * Διαχείριση Σφαλμάτων:
+ *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess)
+ */
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
-    err = cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice);
-    if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice) failed."); exit(1); }
 
-    cudaEventRecord(start,0);
+    err = cudaEventRecord(start,0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start,0) failed."); exit(1); }
+
     calcAvg<<<dimGrid, dimBlock>>>(d_A, d_sum, d_avg);
-    cudaEventRecord(stop,0);
+    
+    err = cudaEventRecord(stop,0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop,0) failed."); exit(1); }
 
     err = cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_avg, d_avg, sizeof(double), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     printf("Average: %4.2f\n", *h_avg);
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime1, start, stop);
+    err = cudaEventSynchronize(stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
+    err = cudaEventElapsedTime(&elapsedTime1, start, stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime1, start, stop) failed."); exit(1); }
+    
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
 
-/* 2η κλήση Kernel */
-
+/* 
+ * === Εκτέλεση Kernel: findMax<<<dimGrid, dimBlock>>> ===
+ * Σκοπός:
+ *   - Υπολογίζει το μέγιστο στοιχείο του πίνακα `d_A` και το αποθηκεύει στη μεταβλητή `d_amax`.
+ *
+ * Διαμόρφωση Πλέγματος και Μπλοκ:
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ * 
+ * Μεταφορές Μνήμης:
+ *   - `cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice)` (προηγούμενη κλήση): Μεταφέρει τον πίνακα εισόδου στη μνήμη της συσκευής.
+ *   - `cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost)`: Ανακτά το μέγιστο στοιχείο από τη συσκευή στη μνήμη του host.
+ *
+ * Χρονισμός:
+ *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ *
+ * Διαχείριση Σφαλμάτων:
+ *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess)
+ */
+    err = cudaEventRecord(start, 0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start,0) failed."); exit(1); }
     
-    cudaEventRecord(start,0);
     findMax<<<dimGrid, dimBlock>>>(d_A, d_amax);
-    cudaEventRecord(stop,0);
+    
+    err = cudaEventRecord(stop, 0);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop,0) failed."); exit(1); }
 
     err = cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost) failed."); exit(1); }
 
     printf("Max: %d\n", *h_amax);
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime2, start, stop);
+    err = cudaEventSynchronize(stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
+    err = cudaEventElapsedTime(&elapsedTime2, start, stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime2, start, stop) failed."); exit(1); }
+
     printf ("Time for the kernel findMax<<<>>>(): %f ms\n", elapsedTime2);
 
-/* 3η κλήση Kernel */
-
+/* 
+ * === Εκτέλεση Kernel: createB ή createC ===
+ * Σκοπός:
+ *   - Αν η συνθήκη (*h_amax > N * (*h_avg)) ικανοποιείται:
+ *       - Εκτελείται το kernel `createB` για τον υπολογισμό του πίνακα B με τιμές
+ *         \( B_{ij} = \frac{\text{m} - A_{ij}}{\text{a}_{\text{max}}} \).
+ *       - Βρίσκεται επίσης το ελάχιστο στοιχείο του πίνακα B.
+ *   - Αν η συνθήκη δεν ικανοποιείται:
+ *       - Εκτελείται το kernel `createC` για τον υπολογισμό του πίνακα C με τιμές
+ *         \( C_{ij} = \frac{A_{ij} + A_{i(j+1)} + A_{i(j-1)}}{3} \).
+ *
+ * Διαμόρφωση Πλέγματος και Μπλοκ:
+ *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks).
+ *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads).
+ * 
+ * Μεταφορές Μνήμης:
+ *   - `cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost)`: Ανακτά τον πίνακα εξόδου (B ή C) από τη μνήμη της συσκευής στη μνήμη του host.
+ *   - Αν εκτελείται το kernel `createB`:
+ *       - `cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost)`: Ανακτά το ελάχιστο στοιχείο του πίνακα B.
+ *
+ * Χρονισμός:
+ *   - Χρησιμοποιεί `cudaEventRecord` για τη μέτρηση του χρόνου εκτέλεσης του kernel.
+ *
+ * Διαχείριση Σφαλμάτων:
+ *   - Κάθε κλήση API της CUDA ακολουθείται από έλεγχο σφάλματος για να διασφαλιστεί η επιτυχής εκτέλεση.
+ *
+ * Παραδοχές:
+ *   - Οι πίνακες έχουν αρχικοποιηθεί και οι διαστάσεις είναι έγκυρες.
+ */
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
@@ -352,7 +481,9 @@ int main(int argc, char *argv[])
         arr = 'B';
 
         createB<<<dimGrid, dimBlock>>>(d_A, d_OutArr, d_bmin, d_amax, d_avg);
-        cudaEventRecord(stop,0);
+        
+        err = cudaEventRecord(stop, 0);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop,0) failed."); exit(1); }
 
         err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
@@ -367,7 +498,9 @@ int main(int argc, char *argv[])
         arr = 'C';
 
         createC<<<dimGrid, dimBlock>>>(d_A, d_OutArr);
-        cudaEventRecord(stop,0);
+        
+        err = cudaEventRecord(stop, 0);
+        if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(stop,0) failed."); exit(1); }
 
         err = cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost);
         if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(&h_OutArr, d_OutArr, doubleBytes, cudaMemcpyDeviceToHost) failed."); exit(1); }
@@ -375,8 +508,11 @@ int main(int argc, char *argv[])
         printf("The array %c has been stored in file %s\n", arr,  argv[2]);
     }
 
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime3, start, stop);
+    err = cudaEventSynchronize(stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventSynchronize(stop) failed."); exit(1); }
+    err = cudaEventElapsedTime(&elapsedTime3, start, stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventElapsedTime(&elapsedTime3, start, stop) failed."); exit(1); }
+
     printf ("Time for the kernel create%c<<<>>>(): %f ms\n", arr, elapsedTime3);
 
 // ============== Λήξη Παράλληλου Υπολογισμού ==============
@@ -398,8 +534,10 @@ int main(int argc, char *argv[])
     fclose(fpA);
     fclose(fpOutArr);
 
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    err = cudaEventDestroy(start);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventDestroy(start) failed."); exit(1); }
+    err = cudaEventDestroy(stop);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaEventDestroy(stop) failed."); exit(1); }
 
     free(h_A);
     free(h_OutArr);
@@ -408,41 +546,58 @@ int main(int argc, char *argv[])
     free(h_bmin);
     free(h_sum);
 
-    cudaFree(d_A);
-    cudaFree(d_OutArr);
-    cudaFree(d_avg);
-    cudaFree(d_amax);
-    cudaFree(d_bmin);
-    cudaFree(d_sum);
+    err = cudaFree(d_A);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_A) failed."); exit(1); }
+    err = cudaFree(d_OutArr);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_OutArr) failed."); exit(1); }
+    err = cudaFree(d_avg);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_avg) failed."); exit(1); }
+    err = cudaFree(d_amax);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_amax) failed."); exit(1); }
+    err = cudaFree(d_bmin);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_bmin) failed."); exit(1); }
+    err = cudaFree(d_sum);
+    if (err != cudaSuccess) { printf("CUDA Error --> cudaFree(d_sum) failed."); exit(1); }
 
     return 0;
 }
 
+/*
+ *  === Συνάρτηση: create2DArray ===
+ *  Παράμετροι: 
+ *      - Array: Δείκτης σε πίνακα μονοδιάστατο (μεταχείριση ως δισδιάστατου).
+ *  Επιστρέφει: Τίποτα.
+ * 
+ *  Περιγραφή:
+ *      Δημιουργεί έναν τυχαίο πίνακα διαστάσεων NxN με τιμές στο διάστημα [1, 100].
+ *      Εξασφαλίζει ότι το μέγιστο στοιχείο του πίνακα είναι μεγαλύτερο από το Ν επί τον μέσο όρο του πίνακα.
+ */
 void create2DArray(int *Array)
 {
-    int sum = 0;
-    int amax = 0;
+    int sum = 0;  // Άθροισμα των στοιχείων του πίνακα
+    int amax = 0; // Μέγιστη τιμή στον πίνακα
     int i, j, m;
 
+    // Γέμισμα του πίνακα με τυχαίες τιμές και υπολογισμός του αθροίσματος και της μέγιστης τιμής
     for (i = 0; i < N; ++i) 
     {
         for (j = 0; j < N; ++j) 
         {
-            Array[i * N + j] = rand() % 100 + 1;
-            sum += Array[i * N + j];
+            Array[i * N + j] = rand() % 100 + 1; // Τυχαία τιμή στο διάστημα [1, 100]
+            sum += Array[i * N + j]; // Προσθήκη στο συνολικό άθροισμα
             if (Array[i * N + j] > amax) 
             {
-                amax = Array[i * N + j];
+                amax = Array[i * N + j]; // Ενημέρωση της μέγιστης τιμής
             }
         }
     }
 
-    m = sum / (N * N); 
-    while (amax <= N * m) 
+    m = sum / (N * N); // Υπολογισμός του μέσου όρου
+    while (amax <= N * m) // Επαλήθευση ότι η μέγιστη τιμή είναι μεγαλύτερη από N * m
     {
-        i = rand() % N;
-        j = rand() % N;
-        Array[i * N + j] += (N * m - amax + 1);
-        amax = Array[i * N + j];
+        i = rand() % N; // Τυχαία επιλογή γραμμής
+        j = rand() % N; // Τυχαία επιλογή στήλης
+        Array[i * N + j] += (N * m - amax + 1); // Αύξηση του στοιχείου ώστε να ικανοποιηθεί η συνθήκη
+        amax = Array[i * N + j]; // Ενημέρωση της μέγιστης τιμής
     }
 }
