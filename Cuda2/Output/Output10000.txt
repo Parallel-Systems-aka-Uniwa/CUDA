@@ -1,0 +1,19 @@
+--------------- Device Properties ---------------
+Device name           : NVIDIA TITAN RTX
+Max threads per block : 1024
+Max block dimensions  : 1024 x 1024 x 64
+Max grid dimensions   : 2147483647 x 65535 x 65535
+-------------------------------------------------
+--------------- Input Parameters ---------------
+Matrix size        : 10000 x 10000
+Blocks per Grid    : 100
+Threads per Block  : 100
+------------------------------------------------
+The array A has been stored in file A/A10000.txt
+The array A_means has been stored in file A_means/A_means10000.txt
+Time for the kernel calcColMeans<<<>>>(): 1.065632 ms
+The array A_submeans has been stored in file A_submeans/A_submeans10000.txt
+The array AT_submeans has been stored in file AT_submeans/AT_submeans10000.txt
+Time for the kernel subMeansT<<<>>>(): 0.009952 ms
+The array A_cov has been stored in file A/A_cov10000.txt
+Time for the kernel calcCov<<<>>>(): 0.124096 ms
