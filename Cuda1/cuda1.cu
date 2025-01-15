@@ -33,7 +33,7 @@
  */
 __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg) 
 {
-    __shared__ int cache[nThreads * N + nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ int cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
     // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -82,7 +82,7 @@ __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg)
  */
 __global__ void findMax(int *d_A, int *d_amax)
 {
-    __shared__ int cache[nThreads * N + nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ int cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
     // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -150,7 +150,7 @@ __device__ void atomicMin(float *address, float val)
  */
 __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, float *d_avg)
 {
-    __shared__ float cache[nThreads * N + nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ float cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
 
     // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
     int i = blockIdx.y * blockDim.y + threadIdx.y;
