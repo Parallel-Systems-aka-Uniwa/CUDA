@@ -1,0 +1,18 @@
+--------------- Device Properties ---------------
+Device name           : NVIDIA TITAN RTX
+Max threads per block : 1024
+Max block dimensions  : 1024 x 1024 x 64
+Max grid dimensions   : 2147483647 x 65535 x 65535
+-------------------------------------------------
+--------------- Input Parameters ---------------
+Matrix size        : 512 x 512
+Blocks per Grid    : 32
+Threads per Block  : 16
+------------------------------------------------
+The array A has been stored in file A/A512.txt
+Average: 3.12
+Time for the kernel calcAvg<<<>>>(): 0.136576 ms
+Max: 100
+Time for the kernel findMax<<<>>>(): 0.016704 ms
+The array C has been stored in file OutArr/OutArr512.txt
+Time for the kernel createC<<<>>>(): 0.016576 ms
