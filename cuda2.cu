@@ -54,34 +54,35 @@ __global__ void subMeansT(int *d_A, float *d_Amean, float *d_Asubmeans, float *d
 __global__ void calcCov(float *d_Asubmeans, float *d_ATsubmeans, float *d_Acov)
 {
     __shared__ float block_result;
-    int block_id = blockIdx.x;
+    int row = blockIdx.x; // Each block processes one row
+    int col = threadIdx.x + blockIdx.y * blockDim.x; // Thread processes part of the column
     int thread_id = threadIdx.x;
-    int row_stride = gridDim.x;
-    int col_stride = blockDim.x;
-    int i, j;
-    float thread_result;
-    
-    for (i = block_id; i < N; i += row_stride) 
-    {
-        thread_result = 0;
-        if (thread_id == 0) 
-            block_result = 0;
+
+    if (row < N && col < N && row <= col) { // Ensure bounds and upper triangular part
+        float thread_result = 0;
+
+        // Each thread computes part of the dot product for (row, col)
+        for (int k = thread_id; k < N; k += blockDim.x) {
+            thread_result += d_Asubmeans[row * N + k] * d_ATsubmeans[col * N + k];
+        }
+
+        // Use shared memory to sum up results within the block
+        if (thread_id == 0)
+            block_result = 0.0f;
+
+        __syncthreads();
+
+        atomicAdd(&block_result, thread_result);
+
+        __syncthreads();
+
+        // First thread writes the result to the global memory
+        if (thread_id == 0) {
+            d_Acov[row * N + col] = block_result;
+        }
     }
-    // Κάθε νήμα επιτελεί τους υπολογισμούς του
-    for (j = thread_id; j < N; j += col_stride) 
-        thread_result += d_Asubmeans[i * N + j] * d_ATsubmeans[i * N + j];
-    
-    // Κάθε νήμα ενημερώνει το μπλοκ με το τοπικό του αποτέλεσμα
-    atomicAdd(&block_result, thread_result);
-    
-    // Αναμονή μέχρι να ολοκληρώσουν όλα τα νήματα την ενημέρωση
-    __syncthreads();
-    
-    // Ένα από τα νήματα ενημερώνει τον κεντρικό πίνακα στην καθολική
-    // μνήμη με το αποτέλεσμα του μπλοκ
-    if (thread_id == 0)
-        d_Acov[i * N + j] = block_result;    
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -244,7 +245,7 @@ int main(int argc, char *argv[])
 
     cudaEventRecord(start, 0);
 
-    calcCov<<<nBlocks, nThreads>>>(d_Asubmeans, d_ATsubmeans, d_Acov);
+    calcCov<<<dimGrid, dimBlock>>>(d_Asubmeans, d_ATsubmeans, d_Acov);
 
     cudaEventRecord(stop, 0);
 
