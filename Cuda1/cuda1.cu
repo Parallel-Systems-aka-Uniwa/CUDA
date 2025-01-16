@@ -15,8 +15,8 @@
 #include <math.h>
 #include <cuda.h>
 
-#define N 20000
-#define nThreads 124
+#define N 10
+#define nThreads 2
 #define nBlocks (int)ceil((float)N/nThreads)
 
 /*
