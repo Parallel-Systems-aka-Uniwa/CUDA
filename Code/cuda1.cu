@@ -1,12 +1,12 @@
 /*
- *  === Αρχείο: cuda1.cu ===
+ *  === File: cuda1.cu ===
  *
- *  Ονοματεπώνυμο: Αθανασίου Βασίλειος Ευάγγελος
- *  Αριθμός Μητρώου: 19390005
- *  Πρόγραμμα Σπουδών: ΠΑΔΑ
+ *  Full Name: Athanasiou Vasileios Evangelos
+ *  Student ID: 19390005
+ *  Degree Program: PADA
  *  
- *  Μεταγλώττιση: nvcc -o cuda1 cuda1.cu
- *  Εκτέλεση: ./cuda1 A.txt OutArr.txt
+ *  Compilation: nvcc -o cuda1 cuda1.cu
+ *  Execution: ./cuda1 A.txt OutArr.txt
  * 
  */
 #include <stdio.h>
@@ -20,163 +20,159 @@
 #define nBlocks (int)ceil((float)N/nThreads)
 
 /*
- *  === Συνάρτηση Πυρήνα: calcAvg ===
- *  Παράμετροι: 
- *      - d_A: Πίνακας εισόδου (Device).
- *      - d_sum: Το άθροισμα των στοιχείων του πίνακα (Device).
- *      - d_avg: Ο μέσος όρος των στοιχείων του πίνακα (Device).
- *  Επιστρέφει: Τίποτα.
+ *  === Kernel Function: calcAvg ===
+ *  Parameters: 
+ *      - d_A: Input array (Device).
+ *      - d_sum: Sum of the elements of the array (Device).
+ *      - d_avg: Average of the elements of the array (Device).
+ *  Returns: Nothing.
  * 
- *  Περιγραφή:
- *      Υπολογίζει το άθροισμα και τον μέσο όρο όλων των στοιχείων του πίνακα A
- *      με χρήση reduction και atomic εντολών.
+ *  Description:
+ *      Computes the sum and average of all elements of array A using reduction and atomic operations.
  */
 __global__ void calcAvg(int *d_A, int *d_sum, float *d_avg) 
 {
-    __shared__ int cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ int cache[nThreads * nThreads];  // Use shared memory for fast access by threads within the same block
 
-    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
+    // Compute the global ID of each thread in the x and y dimensions
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
     int totalElements = N * N;
-    int tid = i * N + j; // Global index για τον 2D πίνακα
+    int tid = i * N + j; // Global index for the 2D array
 
-    if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
+    if (i < N && j < N)  // Ensure we are within bounds
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Αποφυγή ανάγνωσης εκτός ορίων
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
 
-    __syncthreads();  // Συγχρονισμός νημάτων στο block
+    __syncthreads();  // Synchronize threads within the block
 
-    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
+    // Perform parallel reduction using a tree-based algorithm within the block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο threads με έγκυρα Id εκτελούν reduction
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid IDs participate in reduction
             cache[threadIdx.x + threadIdx.y * blockDim.x] += 
                 cache[threadIdx.x + threadIdx.y * blockDim.x + k];
-        __syncthreads();  // Συγχρονισμός νημάτων στο block
+        __syncthreads();  // Synchronize threads within the block
         k /= 2; 
     }
 
-    // Χρήση atomic λειτουργίας πρόσθεσης στο συνολικό άθροισμα εάν το νήμα είναι το πρώτο στο block
+    // Use an atomic addition to update the global sum if this thread is the first in the block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicAdd(d_sum, cache[0]);
 
-    // Υπολογισμός του μέσου όρου μετά το reduction
+    // Compute the average after the reduction (only in block (0,0))
     if (threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 0 && blockIdx.y == 0)
         *d_avg = (float)(*d_sum) / totalElements;
 }
 
-
 /*
- *  === Συνάρτηση Πυρήνα: findMax ===
- *  Παράμετροι: 
- *      - d_A: Πίνακας εισόδου (Device).
- *      - d_amax: Το μέγιστο στοιχείο του πίνακα A (Device).
- *  Επιστρέφει: Τίποτα.
+ *  === Kernel Function: findMax ===
+ *  Parameters: 
+ *      - d_A: Input array (Device).
+ *      - d_amax: The maximum element of array A (Device).
+ *  Returns: Nothing.
  * 
- *  Περιγραφή:
- *      Υπολογίζει το μέγιστο στοιχείο του πίνακα A χρησιμοποιώντας reduction και atomic εντολές.
+ *  Description:
+ *      Computes the maximum element of array A using reduction and atomic operations.
  */
 __global__ void findMax(int *d_A, int *d_amax)
 {
-    __shared__ int cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ int cache[nThreads * nThreads];  // Use shared memory for fast access by threads within the same block
 
-    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
+    // Compute the global ID of each thread in the x and y dimensions
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
-    int tid = i * N + j; // Global index για τον 2D πίνακα
+    int tid = i * N + j; // Global index for the 2D array
 
-    if (i < N && j < N)  // Διασφάλιση ότι βρισκόμαστε εντός ορίων
+    if (i < N && j < N)  // Ensure we are within bounds
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_A[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Αποφυγή ανάγνωσης εκτός ορίων
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 0;  // Avoid out-of-bound reads
 
-    __syncthreads();  // Συγχρονισμός νημάτων στο block
+    __syncthreads();  // Synchronize threads within the block
 
-    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
+    // Perform parallel reduction using a tree-based algorithm within the block
     int k = blockDim.x * blockDim.y / 2; 
     while (k != 0) 
     {
-        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Μόνο threads με έγκυρα Id εκτελούν reduction
+        if (threadIdx.x + threadIdx.y * blockDim.x < k)  // Only threads with valid IDs participate in reduction
             cache[threadIdx.x + threadIdx.y * blockDim.x] = 
                 cache[threadIdx.x + threadIdx.y * blockDim.x] > cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
-        __syncthreads();  // Συγχρονισμός νημάτων στο block
+        __syncthreads();  // Synchronize threads within the block
         k /= 2;
     }
 
-    // Χρήση atomic λειτουργίας εύρεσης μέγιστου στοιχείου στο συνολικό μέγιστο αν αυτό το νήμα είναι το πρώτο στο block
+    // Use atomic operation to update the global maximum if this thread is the first in the block
     if (threadIdx.x == 0 && threadIdx.y == 0) 
         atomicMax(d_amax, cache[0]);
 }
 
-
-// Custom atomicMin για αριθμούς κινητής υποδιαστολής με χρήση atomicCAS
+// Custom atomicMin for floating-point numbers using atomicCAS
 __device__ void atomicMin(float *address, float val)
 {
-    int *address_as_i = (int *) address;  // Μετατροπή της διεύθυνσης σε ακέραιο δείκτη
+    int *address_as_i = (int *) address;  // Convert address to an integer pointer
     int old = *address_as_i, assumed;
 
-    // Μετατροπή της τιμής κινητής υποδιαστολής σε ακέραια αναπαράσταση
+    // Convert the floating-point value to its integer representation
     int val_as_int = __float_as_int(val);
 
     do
     {
         assumed = old;
-        // Εκτέλεση atomicCAS στη δεκαδική αναπαράσταση
+        // Perform atomicCAS on the integer representation
         old = atomicCAS(address_as_i, assumed, min(val_as_int, assumed));
     } 
-    while (assumed != old);  // Επανάληψη μέχρι να μην αλλάξει η τιμή
+    while (assumed != old);  // Repeat until no change occurs
 }
 
-
 /*
- *  === Συνάρτηση: createB ===
- *  Παράμετροι: 
- *      - d_A: Πίνακας εισόδου (Device).
- *      - d_outArr: Πίνακας εξόδου B (Device).
- *      - d_bmin: Το ελάχιστο στοιχείο του πίνακα B (Device).
- *      - d_amax: Το μέγιστο στοιχείο του πίνακα A (Device).
- *      - d_avg: Ο μέσος όρος των στοιχείων του πίνακα A (Device).
- *  Επιστρέφει: Τίποτα.
+ *  === Kernel Function: createB ===
+ *  Parameters: 
+ *      - d_A: Input array (Device).
+ *      - d_outArr: Output array B (Device).
+ *      - d_bmin: The minimum element of array B (Device).
+ *      - d_amax: The maximum element of array A (Device).
+ *      - d_avg: The average of the elements of array A (Device).
+ *  Returns: Nothing.
  * 
- *  Περιγραφή:
- *      Υπολογίζει τον πίνακα B με στοιχεία  Bij = (m - Aij) / amax, όπου m είναι ο μέσος όρος των στοιχείων του Α 
- *      και βρίσκει το ελάχιστο στοιχείο του με χρήση reduction και atomic εντολών.
+ *  Description:
+ *      Computes array B with elements Bij = (m - Aij) / amax, where m is the average of A,
+ *      and finds the minimum element using reduction and atomic operations.
  */
 __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, float *d_avg)
 {
-    __shared__ float cache[nThreads * nThreads];  // Χρήση shared memory για γρήγορη προσπέλαση από threads ίδιου block
+    __shared__ float cache[nThreads * nThreads];  // Use shared memory for fast access by threads within the same block
 
-    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
+    // Compute the global ID of each thread in the x and y dimensions
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // Υπολογισμός της αντίστοιχης τιμής για το Bij
+    // Compute the corresponding value for Bij
     if (i < N && j < N)
     {
         if (*d_amax != 0)
             d_outArr[i * N + j] = (*d_avg - (float) d_A[i * N + j]) / (float) *d_amax;
         else
-            d_outArr[i * N + j] = 0.0; // Διαχείριση της διαίρεσης με το μηδέν
+            d_outArr[i * N + j] = 0.0; // Handle division by zero
     }
 
-    int tid = i * N + j; // Global index για τον 2D πίνακα
+    int tid = i * N + j; // Global index for the 2D array
 
-    // Φόρτωση δεδομένων στην κοινή μνήμη (cache)
+    // Load data into shared memory (cache)
     if (i < N && j < N)  
         cache[threadIdx.x + threadIdx.y * blockDim.x] = d_outArr[tid];
     else
-        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Χρήση μεγάλης τιμής ως προσωρινή τιμή για νήματα εκτός ορίων
+        cache[threadIdx.x + threadIdx.y * blockDim.x] = 10000000000000.0;  // Use a very large value for threads out of bounds
 
-    __syncthreads();  // Συγχρονισμός νημάτων στο block
+    __syncthreads();  // Synchronize threads within the block
 
-    // Εκτέλεση παράλληλου reduction με χρήση δεντρικού αλγορίθμου εντός του block
-    int k = blockDim.x * blockDim.y / 2;  // Μείωση κατά το μισό των συνολικών νημάτων
+    // Perform parallel reduction using a tree-based algorithm within the block
+    int k = blockDim.x * blockDim.y / 2;  // Half of the total threads
     while (k != 0) 
     {
         if (threadIdx.x + threadIdx.y * blockDim.x < k) 
@@ -185,88 +181,131 @@ __global__ void createB(int *d_A, float *d_outArr, float *d_bmin, int *d_amax, f
                 cache[threadIdx.x + threadIdx.y * blockDim.x] < cache[threadIdx.x + threadIdx.y * blockDim.x + k] ?
                 cache[threadIdx.x + threadIdx.y * blockDim.x] : cache[threadIdx.x + threadIdx.y * blockDim.x + k];
         }
-        __syncthreads();  // Συγχρονισμός νημάτων
-        k /= 2;  // Μείωση του βήματος κατά το μισό σε κάθε επανάληψη
+        __syncthreads();  // Synchronize threads
+        k /= 2;  // Halve the step in each iteration
     }
 
-    // Χρήση atomic λειτουργίας για την ελάχιστη τιμή του πίνακα B χρησιμοποιώντας την custom atomicMin
+    // Use the custom atomicMin operation to update the global minimum of B
     if (threadIdx.x == 0 && threadIdx.y == 0) 
-        atomicMin(d_bmin, cache[0]);  // Χρήση της custom atomicMin για αριθμούς κινητής υποδιαστολής
+        atomicMin(d_bmin, cache[0]);
 }
 
 /*
- *  === Συνάρτηση: createC ===
- *  Παράμετροι: 
- *      - d_A: Πίνακας εισόδου (Device).
- *      - d_outArr: Πίνακας εξόδου C (Device).
- *  Επιστρέφει: Τίποτα.
+ *  === Kernel Function: createC ===
+ *  Parameters: 
+ *      - d_A: Input array (Device).
+ *      - d_outArr: Output array C (Device).
+ *  Returns: Nothing.
  * 
- *  Περιγραφή:
- *      Υπολογίζει τον πίνακα C με στοιχεία 
- *      Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3, λαμβάνοντας υπόψη
- *      εάν j+1=N τότε Ai(j+1)=Ai0, ενώ εάν j-1=-1 τότε Ai(j-1)=Ai(Ν-1).
+ *  Description:
+ *      Computes array C with elements 
+ *      Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3, taking into account
+ *      that if j+1 = N then Ai(j+1)=Ai0, and if j-1 = -1 then Ai(j-1)=Ai(N-1).
  */
 __global__ void createC(int *d_A, float *d_outArr)
 {
-    // Υπολογισμός global Id κάθε thread στην x και στην y διάσταση
+    // Compute the global ID of each thread in the x and y dimensions
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     
     int left, right, current;
 
-    // Έλεγχος αν βρισκόμαστε εντός ορίων
+    // Check if we are within bounds
     if (i < N && j < N)
     {
-        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Αριστερό στοιχείο(διαχείριση ορίων)
-        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Δεξιό στοιχείο (διαχείριση ορίων)
-        current = d_A[i * N + j];  // Τρέχον στοιχείο
+        left = (j - 1 != -1) ? d_A[i * N + (j - 1)] : d_A[i * N + (N - 1)];  // Left element (boundary handling)
+        right = (j + 1 != N) ? d_A[i * N + (j + 1)] : d_A[i * N + 0];  // Right element (boundary handling)
+        current = d_A[i * N + j];  // Current element
         
-        // Υπολογισμός του Cij
+        // Compute Cij
         d_outArr[i * N + j] = (float) (current + left + right) / 3.0;
     }
 }
 
+/*
+ *  === Function: create2DArray ===
+ *  Parameters: 
+ *      - Array: Pointer to a one-dimensional array (treated as 2D).
+ *  Returns: Nothing.
+ * 
+ *  Description:
+ *      Creates a random NxN array with values in the range [1, 100].
+ *      Ensures that the maximum element of the array is greater than (or less than) N times the 
+ *      average of the array.
+ */
+void create2DArray(int *Array)
+{
+    int sum = 0;  // Sum of the elements of the array
+    int amax = 0; // Maximum value in the array
+    int i, j, m;
 
-void create2DArray(int *Array);
+    // Fill the array with random values and compute the sum and maximum value
+    for (i = 0; i < N; ++i) 
+    {
+        for (j = 0; j < N; ++j) 
+        {
+            Array[i * N + j] = rand() % 100 + 1; // Random value in [1, 100]
+            sum += Array[i * N + j]; // Add to total sum
+            if (Array[i * N + j] > amax) 
+            {
+                amax = Array[i * N + j]; // Update maximum value
+            }
+        }
+    }
 
+    m = sum / (N * N); // Compute the average
+    while (amax <= N * m) // Ensure that the maximum value is greater than N * m
+    {
+        i = rand() % N; // Random row selection
+        j = rand() % N; // Random column selection
+        Array[i * N + j] += (N * m - amax + 1); // Increase the element so the condition is met
+        amax = Array[i * N + j]; // Update maximum value
+    }
+}
+
+/*
+ *  === Second Part: Host Code using CUDA Kernels ===
+ */
+ 
+// Declaration of host main function
 int main(int argc, char *argv[])
 {
-    int *h_A;                                                        // [Host] Ο πίνακας Α 
-    int *h_amax, *h_sum;                                             // [Host] Το μέγιστο στοιχείο του Α και το άθροισμα των στοιχείων
-    int *d_A, *d_amax, *d_sum;                                       // [Device] Ο πίνακας Α, το μέγιστο στοιχείο και το άθροισμα των στοιχείων
-    float *h_OutArr;                                                 // [Host] Ο πίνακας B ή C
-    float *h_avg;                                                    // [Host] Ο μέσος όρος των στοιχείων του Α
-    float *d_OutArr, *d_avg;                                         // [Device] Ο πίνακας B ή C και ο μέσος όρος
-    float *h_bmin, *d_bmin;                                          // [Host] Το ελάχιστο στοιχείο του B και [Device] το ελάχιστο στοιχείο
-    int n, threadsPerBlock, blocksPerGrid;                           // Το μέγεθος του πίνακα, τα νήματα ανά μπλοκ και τα μπλοκ ανά πλέγμα
-    int intBytes, floatBytes;                                        // Το μέγεθος των πινάκων σε bytes
-    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ; // Οι μέγιστες τιμές για τα νήματα και τις διαστάσεις των μπλοκ
-    int max_grid_dimX, max_grid_dimY, max_grid_dimZ;                 // Οι μέγιστες τιμές για τις διαστάσεις των πλεγμάτων
-    int i, j;                                                        // Δείκτες επανάληψης
-    FILE *fpA, *fpOutArr;                                            // Δείκτες αρχείων για την αποθήκευση των πινάκων Α και Β ή C
-    char arr;                                                        // Το όνομα του πίνακα Β ή C
-    float elapsedTime1, elapsedTime2, elapsedTime3;                  // Ο χρόνος εκτέλεσης των kernels
-    cudaEvent_t start, stop;                                         // Τα σημεία αναφοράς του χρόνου εκτέλεσης
-    cudaError_t err;                                                 // Κωδικός σφάλματος CUDA
-    cudaDeviceProp prop;                                             // Τα χαρακτηριστικά της συσκευής
+    int *h_A;                                                        // [Host] Array A 
+    int *h_amax, *h_sum;                                             // [Host] Maximum element of A and the sum of the elements
+    int *d_A, *d_amax, *d_sum;                                       // [Device] Array A, maximum element, and sum of elements
+    float *h_OutArr;                                                 // [Host] Output array B or C
+    float *h_avg;                                                    // [Host] Average of the elements of A
+    float *d_OutArr, *d_avg;                                         // [Device] Array B or C and the average
+    float *h_bmin, *d_bmin;                                          // [Host] Minimum element of B and [Device] minimum element
+    int n, threadsPerBlock, blocksPerGrid;                           // Array size, threads per block, and blocks per grid
+    int intBytes, floatBytes;                                        // Array sizes in bytes
+    int max_threads, max_block_dimX, max_block_dimY, max_block_dimZ; // Maximum values for threads and block dimensions
+    int max_grid_dimX, max_grid_dimY, max_grid_dimZ;                 // Maximum values for grid dimensions
+    int i, j;                                                        // Loop indices
+    FILE *fpA, *fpOutArr;                                            // File pointers for storing arrays A and B or C
+    char arr;                                                        // Name of the output array (B or C)
+    float elapsedTime1, elapsedTime2, elapsedTime3;                  // Kernel execution times
+    cudaEvent_t start, stop;                                         // CUDA events for timing
+    cudaError_t err;                                                 // CUDA error code
+    cudaDeviceProp prop;                                             // Device properties
 
-    // Έλεγχος αριθμού παραμέτρων γραμμής εντολών
+    // Check command-line parameter count
     if (argc != 3)
     {
         printf("Usage: %s A.txt OutArr.txt\n", argv[0]);
         exit(1);
     }
 
-    // Αρχικοποίηση παραμέτρων
+    // Initialize parameters
     n = N;
     threadsPerBlock = nThreads;
     blocksPerGrid = nBlocks;
 
-    // Λήψη ιδιοτήτων συσκευής CUDA
+    // Get CUDA device properties
     err = cudaGetDeviceProperties(&prop, 0); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaGetDeviceProperties failed.\n"); exit(1); }
 
-    // Ανάθεση μέγιστων τιμών από τις ιδιότητες της συσκευής
+    // Assign maximum values from device properties
     max_threads = prop.maxThreadsPerBlock;
     max_block_dimX = prop.maxThreadsDim[0];
     max_block_dimY = prop.maxThreadsDim[1];
@@ -275,7 +314,7 @@ int main(int argc, char *argv[])
     max_grid_dimY = prop.maxGridSize[1];
     max_grid_dimZ = prop.maxGridSize[2];
 
-    // Εκτύπωση χαρακτηριστικών συσκευής
+    // Print device properties
     printf("--------------- Device Properties ---------------\n");
     printf("Device name           : %s\n", prop.name);
     printf("Max threads per block : %d\n", max_threads);
@@ -283,7 +322,7 @@ int main(int argc, char *argv[])
     printf("Max grid dimensions   : %d x %d x %d\n", max_grid_dimX, max_grid_dimY, max_grid_dimZ);
     printf("-------------------------------------------------\n");
 
-    // Έλεγχος έγκυρων τιμών για τις παραμέτρους
+    // Validate parameter values
     if (n < 1)
     { printf("Error --> Matrix size must be at least 1\n"); exit(1); }
     if (threadsPerBlock < 1)
@@ -295,24 +334,24 @@ int main(int argc, char *argv[])
     if (blocksPerGrid > max_grid_dimX)
     { printf("Error --> Blocks per grid (grid size) exceed maximum allowed for %s\n", prop.name); exit(1); }
 
-    // Άνοιγμα αρχείων για αποθήκευση των πινάκων
+    // Open files to store arrays
     fpA = fopen(argv[1], "w");
     if (fpA == NULL) { printf("Cannot open file %s\n", argv[1]); exit(1); }
     fpOutArr = fopen(argv[2], "w");
     if (fpOutArr == NULL) { printf("Cannot open file %s\n", argv[2]); exit(1); }
 
-    // Εκτύπωση παραμέτρων εισόδου
+    // Print input parameters
     printf("--------------- Input Parameters ---------------\n");
     printf("Matrix size        : %d x %d\n", n, n);
     printf("Blocks per Grid    : %d\n", blocksPerGrid);
     printf("Threads per Block  : %d\n", threadsPerBlock);
     printf("------------------------------------------------\n");
 
-    // Υπολογισμός μεγέθους πινάκων σε bytes
+    // Calculate array sizes in bytes
     intBytes = n * n * sizeof(int);
     floatBytes = n * n * sizeof(float);
 
-    // Δέσμευση μνήμης για τους πίνακες στη μνήμη του Host
+    // Allocate host memory for arrays
     h_A = (int *) malloc(intBytes);
     if (h_A == NULL) { printf("Error --> Memory allocation failed for A.\n"); exit(1); }
     h_OutArr = (float *) malloc(floatBytes);
@@ -326,7 +365,7 @@ int main(int argc, char *argv[])
     h_sum = (int *) malloc(sizeof(int));
     if (h_sum == NULL) { printf("Error --> Memory allocation failed for sum.\n"); exit(1); }
 
-    // Αρχικοποίηση μεταβλητών
+    // Initialize variables
     *h_sum = 0;
     *h_avg = 0.0;
     *h_amax = 0;
@@ -334,20 +373,19 @@ int main(int argc, char *argv[])
 
     srand(time(NULL));
 
-    // Δημιουργία πίνακα Α με πρόγραμμα γεννήτριας τυχαίων αριθμών
+    // Create array A using a random number generator program
     create2DArray(h_A);
     printf("The array A has been stored in file %s\n", argv[1]);
 
+// ============== Start of Parallel Computation ==============
 
-// ============== Έναρξη Παράλληλου Υπολογισμού ==============
-
-    // Δημιουργία CUDA events για μέτρηση χρόνου
+    // Create CUDA events for timing
     err = cudaEventCreate(&start);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&start) failed.\n"); exit(1); }
     err = cudaEventCreate(&stop);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventCreate(&stop) failed.\n"); exit(1); }
 
-    // Δέσμευση μνήμης στη συσκευή (Device)
+    // Allocate device memory
     err = cudaMalloc((void **) &d_A, intBytes);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_A, bytes) failed."); exit(1); }
     err = cudaMalloc((void **) &d_OutArr, floatBytes);
@@ -361,30 +399,30 @@ int main(int argc, char *argv[])
     err = cudaMalloc((void **) &d_bmin, sizeof(float)); 
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMalloc((void **) &d_bmin, sizeof(int)) failed."); exit(1); }
 
-    // Δημιουργία 2D grid με 2D blocks
+    // Create 2D grid with 2D blocks
     dim3 dimBlock(nThreads, nThreads);
     dim3 dimGrid(N/nBlocks, N/nBlocks);
 
-/* 
- * === Εκτέλεση Kernel: calcAvg<<<dimGrid, dimBlock>>> ===
- * Σκοπός:
- *   - Υπολογίζει το άθροισμα όλων των στοιχείων του πίνακα d_A και υπολογίζει τον μέσο όρο τους.
- *
- * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
- * 
- * Μεταφορές Μνήμης:
- *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) μεταφέρει τον πίνακα εισόδου από τη μνήμη του host στη μνήμη της συσκευής.
- *   - cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice) μεταφέρει τη μεταβλητή αρχικοποίησης του αθροίσματος στη συσκευή.
- *   - cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost) ανακτά τον υπολογισμένο μέσο όρο από τη συσκευή στη μνήμη του host.
- *
- * Μέτρηση απόδοσης:
- *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
- *
- * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
- */
+    /* 
+     * === Execute Kernel: calcAvg<<<dimGrid, dimBlock>>> ===
+     * Purpose:
+     *   - Computes the sum of all elements of d_A and calculates their average.
+     *
+     * Grid and Block Configuration:
+     *   - dimGrid  : Number of blocks in the grid (X: nBlocks, Y: nBlocks, Z: 1).
+     *   - dimBlock : Number of threads per block (X: nThreads, Y: nThreads, Z: 1).
+     *
+     * Memory Transfers:
+     *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) transfers the input array from host to device.
+     *   - cudaMemcpy(d_sum, h_sum, sizeof(int), cudaMemcpyHostToDevice) transfers the initial sum variable to the device.
+     *   - cudaMemcpy(h_avg, d_avg, sizeof(float), cudaMemcpyDeviceToHost) retrieves the computed average from device to host.
+     *
+     * Performance Measurement:
+     *   - Uses CUDA events to measure kernel execution time.
+     *
+     * Error Handling:
+     *   - Each CUDA call is followed by an error check (if not cudaSuccess).
+     */
     err = cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaMemcpy(d_A, A, bytes, cudaMemcpyHostToDevice) failed."); exit(1); }
 
@@ -408,25 +446,25 @@ int main(int argc, char *argv[])
     
     printf ("Time for the kernel calcAvg<<<>>>(): %f ms\n", elapsedTime1);
 
-/* 
- * === Εκτέλεση Kernel: findMax<<<dimGrid, dimBlock>>> ===
- * Σκοπός:
- *   - Υπολογίζει το μέγιστο στοιχείο του πίνακα d_A και το αποθηκεύει στη μεταβλητή d_amax.
- *
- * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
- * 
- * Μεταφορές Μνήμης:
- *   - cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice) (προηγούμενη κλήση): Μεταφέρει τον πίνακα εισόδου στη μνήμη της συσκευής.
- *   - cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost): Ανακτά το μέγιστο στοιχείο από τη συσκευή στη μνήμη του host.
- *
- * Μέτρηση απόδοσης:
- *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
- *
- * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
- */
+    /* 
+     * === Execute Kernel: findMax<<<dimGrid, dimBlock>>> ===
+     * Purpose:
+     *   - Computes the maximum element of array d_A and stores it in d_amax.
+     *
+     * Grid and Block Configuration:
+     *   - dimGrid  : Number of blocks in the grid (X: nBlocks, Y: nBlocks, Z: 1).
+     *   - dimBlock : Number of threads per block (X: nThreads, Y: nThreads, Z: 1).
+     *
+     * Memory Transfers:
+     *   - (Previous call) cudaMemcpy(d_A, h_A, intBytes, cudaMemcpyHostToDevice): Transfers input array to device.
+     *   - cudaMemcpy(h_amax, d_amax, sizeof(int), cudaMemcpyDeviceToHost): Retrieves the maximum element from device to host.
+     *
+     * Performance Measurement:
+     *   - Uses CUDA events to measure kernel execution time.
+     *
+     * Error Handling:
+     *   - Each CUDA call is followed by an error check.
+     */
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start,0) failed."); exit(1); }
     
@@ -447,32 +485,32 @@ int main(int argc, char *argv[])
 
     printf ("Time for the kernel findMax<<<>>>(): %f ms\n", elapsedTime2);
 
-/* 
- * === Εκτέλεση Kernel: createB ή createC ===
- * Σκοπός:
- *   - Αν η συνθήκη (amax > N * m) ικανοποιείται:
- *       - Εκτελείται η συνάρτηση kernel createB για τον υπολογισμό του πίνακα B με τιμές
- *         Bij = (m - Aij) / amax.
- *       - Βρίσκεται επίσης το ελάχιστο στοιχείο του πίνακα B.
- *   - Αν η συνθήκη δεν ικανοποιείται:
- *       - Εκτελείται η συνάρτηση kernel createC για τον υπολογισμό του πίνακα C με τιμές
- *         Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3.
- *
- * Διαμόρφωση Πλέγματος και Μπλοκ:
- *   - dimGrid  : Αντιπροσωπεύει τον αριθμό των μπλοκ στο πλέγμα (X: nBlocks, Y: nBlocks, Z: 1).
- *   - dimBlock : Αντιπροσωπεύει τον αριθμό νημάτων σε κάθε μπλοκ (X: nThreads, Y: nThreads, Z: 1).
- * 
- * Μεταφορές Μνήμης:
- *   - cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost): Ανακτά τον πίνακα εξόδου (B ή C) από τη μνήμη της συσκευής στη μνήμη του host.
- *   - Αν εκτελείται η συνάρτηση kernel createB:
- *       - cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost): Ανακτά το ελάχιστο στοιχείο του πίνακα B.
- *
- * Μέτρηση απόδοσης:
- *   - Χρησιμοποιεί cudaEvent δομή για τη μέτρηση του χρόνου εκτέλεσης του kernel.
- *
- * Διαχείριση Σφαλμάτων:
- *   - Κάθε κλήση της CUDA ρουτίνας ακολουθείται από έλεγχο σφάλματος (αν επιστρέφεται cudaSuccess).
- */
+    /* 
+     * === Execute Kernel: createB or createC ===
+     * Purpose:
+     *   - If the condition (amax > N * m) is satisfied:
+     *       - Execute kernel createB to compute array B with values
+     *         Bij = (m - Aij) / amax.
+     *       - Also find the minimum element of array B.
+     *   - If the condition is not satisfied:
+     *       - Execute kernel createC to compute array C with values
+     *         Cij = {Aij + Ai(j+1) + Ai(j-1)} / 3.
+     *
+     * Grid and Block Configuration:
+     *   - dimGrid  : Number of blocks in the grid (X: nBlocks, Y: nBlocks, Z: 1).
+     *   - dimBlock : Number of threads per block (X: nThreads, Y: nThreads, Z: 1).
+     *
+     * Memory Transfers:
+     *   - cudaMemcpy(h_OutArr, d_OutArr, floatBytes, cudaMemcpyDeviceToHost): Retrieves the output array (B or C) from device to host.
+     *   - If kernel createB is executed:
+     *       - cudaMemcpy(h_bmin, d_bmin, sizeof(float), cudaMemcpyDeviceToHost): Retrieves the minimum element of array B.
+     *
+     * Performance Measurement:
+     *   - Uses CUDA events to measure kernel execution time.
+     *
+     * Error Handling:
+     *   - Each CUDA call is followed by an error check.
+     */
     err = cudaEventRecord(start, 0);
     if (err != cudaSuccess) { printf("CUDA Error --> cudaEventRecord(start, 0) failed."); exit(1); }
 
@@ -515,7 +553,7 @@ int main(int argc, char *argv[])
 
     printf ("Time for the kernel create%c<<<>>>(): %f ms\n", arr, elapsedTime3);
 
-// ============== Λήξη Παράλληλου Υπολογισμού ==============
+// ============== End of Parallel Computation ==============
 
     fprintf(fpOutArr, "Array %c\n", arr);
 
@@ -563,42 +601,42 @@ int main(int argc, char *argv[])
 }
 
 /*
- *  === Συνάρτηση: create2DArray ===
- *  Παράμετροι: 
- *      - Array: Δείκτης σε πίνακα μονοδιάστατο (μεταχείριση ως δισδιάστατου).
- *  Επιστρέφει: Τίποτα.
+ *  === Function: create2DArray ===
+ *  Parameters: 
+ *      - Array: Pointer to a one-dimensional array (handled as 2D).
+ *  Returns: Nothing.
  * 
- *  Περιγραφή:
- *      Δημιουργεί έναν τυχαίο πίνακα διαστάσεων NxN με τιμές στο διάστημα [1, 100].
- *      Εξασφαλίζει ότι το μέγιστο στοιχείο του πίνακα είναι μεγαλύτερο ή μικρότερο από το Ν επί τον 
- *      μέσο όρο του πίνακα.
+ *  Description:
+ *      Creates a random NxN array with values in the range [1, 100].
+ *      Ensures that the maximum element of the array is either greater or less than N times the
+ *      average of the array.
  */
 void create2DArray(int *Array)
 {
-    int sum = 0;  // Άθροισμα των στοιχείων του πίνακα
-    int amax = 0; // Μέγιστη τιμή στον πίνακα
+    int sum = 0;  // Sum of the array elements
+    int amax = 0; // Maximum value in the array
     int i, j, m;
 
-    // Γέμισμα του πίνακα με τυχαίες τιμές και υπολογισμός του αθροίσματος και της μέγιστης τιμής
+    // Fill the array with random values and compute the sum and maximum value
     for (i = 0; i < N; ++i) 
     {
         for (j = 0; j < N; ++j) 
         {
-            Array[i * N + j] = rand() % 100 + 1; // Τυχαία τιμή στο διάστημα [1, 100]
-            sum += Array[i * N + j]; // Προσθήκη στο συνολικό άθροισμα
+            Array[i * N + j] = rand() % 100 + 1; // Random value in [1, 100]
+            sum += Array[i * N + j]; // Add to total sum
             if (Array[i * N + j] > amax) 
             {
-                amax = Array[i * N + j]; // Ενημέρωση της μέγιστης τιμής
+                amax = Array[i * N + j]; // Update maximum value
             }
         }
     }
 
-    m = sum / (N * N); // Υπολογισμός του μέσου όρου
-    while (amax <= N * m) // Επαλήθευση ότι η μέγιστη τιμή είναι μεγαλύτερη από N * m
+    m = sum / (N * N); // Compute the average
+    while (amax <= N * m) // Verify that the maximum value is greater than N * m
     {
-        i = rand() % N; // Τυχαία επιλογή γραμμής
-        j = rand() % N; // Τυχαία επιλογή στήλης
-        Array[i * N + j] += (N * m - amax + 1); // Αύξηση του στοιχείου ώστε να ικανοποιηθεί η συνθήκη
-        amax = Array[i * N + j]; // Ενημέρωση της μέγιστης τιμής
+        i = rand() % N; // Randomly select a row
+        j = rand() % N; // Randomly select a column
+        Array[i * N + j] += (N * m - amax + 1); // Increase the element to satisfy the condition
+        amax = Array[i * N + j]; // Update maximum value
     }
 }
