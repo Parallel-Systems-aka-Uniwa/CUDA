@@ -236,18 +236,28 @@ Parallel reduction with atomic operations
 ### Maximum (findMax) 
 Parallel search for largest element
 
-### Matrix B (createB) 
+### Matrix B (createB)
 
 $$
-Bᵢⱼ = a_max − Aᵢⱼ (i ≠ j), Bᵢᵢ = a_max; 
+B_{ij} =
+\begin{cases} 
+a_{\text{max}} - A_{ij}, & i \ne j \\[2mm]
+a_{\text{max}}, & i = j
+\end{cases}
 $$
 
-also finds min(B)
-
-### Matrix C (createC) 
+Also, to find the minimum element of B:
 
 $$
-Cᵢⱼ = 3·Aᵢⱼ + Aᵢ(j+1) + Aᵢ(j−1)
+B_{\min} = \min(B_{ij})
+$$
+
+---
+
+### Matrix C (createC)
+
+$$
+C_{ij} = 3 \, A_{ij} + A_{i,j+1} + A_{i,j-1}
 $$
 
 ---
