@@ -241,7 +241,7 @@ Parallel search for largest element
 $$
 B_{ij} =
 \begin{cases} 
-a_{\text{max}} - A_{ij}, & i \ne j \\[2mm]
+a_{\text{max}} - A_{ij}, & i \ne j \\
 a_{\text{max}}, & i = j
 \end{cases}
 $$
