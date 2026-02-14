@@ -276,3 +276,9 @@ Experiments were conducted on various matrix sizes:
 Observations:
 - Execution times for calcAvg scale linearly with matrix size.
 - `findMax` and `createC` remain high-performance even for large matrices due to optimized parallel kernels.
+
+---
+
+## Known Issues & Troubleshooting
+- **Memory Allocation**: Large arrays may cause cudaMemcpy failures if GPU memory is insufficient.
+- **Shared Memory Limits**: Over-allocation per block may lead to kernel launch failures.
